@@ -56,10 +56,10 @@ export const StatusBar: React.FC = () => {
   };
 
   return (
-    <div className="h-9 bg-theme-surface border-t border-theme-border flex items-center px-4 text-xs">
+    <div className="h-9 bg-theme-surface border-t border-theme-border flex items-center px-3 sm:px-4 text-xs overflow-hidden">
       {/* Left side */}
-      <div className="flex items-center gap-4">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <div
             className={`w-1.5 h-1.5 rounded-full ${
               isConnected
@@ -67,24 +67,24 @@ export const StatusBar: React.FC = () => {
                 : 'bg-theme-error'
             }`}
           />
-          <span className="text-theme-text-muted">
+          <span className="text-theme-text-muted hidden sm:inline">
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
         </div>
 
         {activeWorkspace && (
-          <div className="flex items-center gap-2 text-theme-text-muted">
-            <Icon name={getIconName(activeWorkspace.icon)} size={12} className="text-theme-text-muted" />
-            <span>{activeWorkspace.name}</span>
+          <div className="flex items-center gap-2 text-theme-text-muted min-w-0">
+            <Icon name={getIconName(activeWorkspace.icon)} size={12} className="text-theme-text-muted flex-shrink-0" />
+            <span className="truncate">{activeWorkspace.name}</span>
           </div>
         )}
       </div>
 
       {/* Right side */}
-      <div className="ml-auto flex items-center gap-4">
+      <div className="ml-auto flex items-center gap-3 sm:gap-4 flex-shrink-0">
         {activeResource && (
           <div className="flex items-center gap-2">
-            <span className="text-theme-text-muted font-mono">
+            <span className="text-theme-text-muted font-mono hidden sm:inline">
               {activeResource.type.toUpperCase()}
             </span>
             <span className={getStatusColor()}>{getStatusText()}</span>
@@ -92,7 +92,7 @@ export const StatusBar: React.FC = () => {
         )}
 
         {activeResource?.pid && (
-          <span className="text-theme-text-muted font-mono">PID: {activeResource.pid}</span>
+          <span className="text-theme-text-muted font-mono hidden md:inline">PID: {activeResource.pid}</span>
         )}
       </div>
     </div>

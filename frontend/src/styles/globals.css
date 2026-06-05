@@ -182,3 +182,30 @@ html.theme-transitioning *::after {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
 }
+
+/* ============================================================
+   Mobile Safe Area — iPhone 刘海/手势条适配
+   ============================================================ */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* 防止 iOS 双击缩放 */
+* {
+  touch-action: manipulation;
+}
+
+/* 移动端优化：禁用长按菜单 */
+.xterm {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* xterm 移动端内边距调整 */
+@media (max-width: 639px) {
+  .xterm {
+    padding: 6px;
+    font-size: 12px;
+  }
+}

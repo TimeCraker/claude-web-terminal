@@ -162,7 +162,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
         <div
           ref={containerRef}
           tabIndex={0}
-          className="absolute inset-2 sm:inset-3 rounded-xl overflow-hidden focus:outline-none"
+          className="absolute inset-1.5 sm:inset-3 rounded-xl overflow-hidden focus:outline-none"
           style={{
             background: 'var(--theme-bg)',
             boxShadow: 'inset 0 0 30px rgba(255,255,255,0.02), 0 0 0 1px var(--theme-border)',
@@ -175,7 +175,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
       </div>
 
       {/* 输入框 + Action Bar */}
-      <div className="px-2 sm:px-3 pt-2 pb-2 sm:pb-3 flex-shrink-0">
+      <div className="px-2 sm:px-3 pt-2 pb-2 sm:pb-3 flex-shrink-0 safe-area-pb">
         <div className="relative group">
           <div
             className="absolute -inset-0.5 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 blur-sm"
@@ -197,7 +197,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
             <button
               onClick={handleSubmit}
               disabled={!inputValue.trim()}
-              className="mr-2 mb-2 px-3 py-1.5 bg-theme-text text-theme-bg rounded-lg text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-theme-glow transition-all duration-200"
+              className="mr-2 mb-2 px-3 py-1.5 bg-theme-text text-theme-bg rounded-lg text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-theme-glow active:scale-95 transition-all duration-200"
             >
               Send
             </button>
@@ -210,7 +210,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           {/* Cancel */}
           <button
             onClick={() => { sendRaw('\x03'); inputRef.current?.focus(); }}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-mono text-theme-error/80 hover:text-theme-error hover:bg-theme-error/10 border border-transparent hover:border-theme-error/20 transition-all active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-error/80 hover:text-theme-error hover:bg-theme-error/10 border border-transparent hover:border-theme-error/20 transition-all active:scale-95"
             title="Ctrl+C"
           >
             <Icon name="x" size={10} />
@@ -220,7 +220,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           {/* Esc */}
           <button
             onClick={() => handleAction('\x1b')}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
             title="Esc"
           >
             <Icon name="chevron-left" size={10} />
@@ -230,7 +230,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           {/* Tab */}
           <button
             onClick={() => handleAction('\t')}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
             title="Tab"
           >
             <Icon name="chevron-right" size={10} />
@@ -250,7 +250,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
               sendRaw('\r');
               inputRef.current?.focus();
             }}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
             title="Shift+Enter: newline"
           >
             <span>↵ Newline</span>
@@ -262,7 +262,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           {/* 切换模式（= Shift+Tab） */}
           <button
             onClick={() => { sendRaw('\x1b[Z'); inputRef.current?.focus(); }}
-            className="flex-shrink-0 px-3 py-1 rounded-lg text-[10px] font-semibold font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95"
+            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-semibold font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95"
             title="Shift+Tab: switch mode"
           >
             切换模式
@@ -275,7 +275,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           <button
             onClick={() => handleAction('\x1b[A')}
             disabled={inputValue.length > 0}
-            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-xs font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
             title="Previous history"
           >
             ↑
@@ -283,7 +283,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           <button
             onClick={() => handleAction('\x1b[B')}
             disabled={inputValue.length > 0}
-            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-xs font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
             title="Next history"
           >
             ↓

@@ -26,7 +26,7 @@ const ThemeCard: React.FC<{
   return (
     <button
       onClick={() => onSelect(theme.id)}
-      className={`group relative w-full text-left rounded-xl p-3 transition-all duration-300 border ${
+      className={`group relative w-full text-left rounded-xl p-3 transition-all duration-300 border active:scale-[0.98] ${
         isActive
           ? 'border-theme-accent/50 glow-active hover-glow'
           : 'border-theme-border hover:border-theme-border-strong hover-glow'
