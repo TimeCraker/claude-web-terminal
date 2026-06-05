@@ -6,20 +6,25 @@
 
 ## 核心特性
 
-- **多工作空间管理** -- 创建、切换、删除工作空间，每个工作空间关联独立的服务器目录
-- **多进程并发** -- 同时运行 Claude Code、Shell、Git 等多种终端进程
-- **长驻上下文** -- PTY 进程在服务端持续运行，关闭浏览器不丢失状态
-- **Buffer Cache 快照** -- 5000 行 ANSI 输出缓存，切换会话时瞬间恢复历史画面
-- **Warp 风格输入** -- xterm.js 只读渲染 + 独立 HTML 输入框，完美支持中文 IME
-- **一键创建工作空间** -- 自动递增命名 (workspace1/2/3...)，自动创建服务器目录
-- **响应式布局** -- 桌面端侧边栏可折叠，移动端自适应
+- **多工作空间管理** — 创建、切换、删除工作空间，每个工作空间关联独立的服务器目录
+- **多进程并发** — 同时运行 Claude Code、Shell、Git 等多种终端进程
+- **长驻上下文** — PTY 进程在服务端持续运行，关闭浏览器不丢失状态
+- **Buffer Cache 快照** — 原始 ANSI chunk 缓存，切换会话时瞬间恢复历史画面
+- **Warp 风格输入** — xterm.js 渲染 + 独立 HTML 输入框，完美支持中文 IME
+- **斜杠命令同步** — 输入 `/` 实时触发 Claude Code 补全菜单
+- **键盘转发** — Tab / Esc / Shift+Tab / Ctrl+C / 方向键直接映射到终端
+- **Action Bar** — 可点击的快捷操作按钮（Cancel / Esc / Tab / Newline / 切换模式）
+- **WebGL 渲染** — GPU 加速，60fps+ 丝滑体验
+- **智能滚动** — 上翻查看历史时不被新内容拉回
+- **一键创建工作空间** — 自动递增命名 (workspace1/2/3...)，自动创建服务器目录
+- **响应式布局** — 桌面端侧边栏可折叠，移动端自适应
 
 ## 技术栈
 
 | 层 | 技术 |
 |---|------|
 | 前端框架 | React 18 + TypeScript + Vite |
-| 终端模拟 | xterm.js + FitAddon |
+| 终端模拟 | xterm.js + WebGL Renderer + FitAddon |
 | 状态管理 | Zustand |
 | 样式 | Tailwind CSS |
 | 后端运行时 | Node.js + tsx |
@@ -45,10 +50,10 @@ claude-web-terminal/
 │       │   ├── BrandLogo.tsx     # 品牌 Logo SVG 组件
 │       │   ├── Icon.tsx          # 集中式 SVG 图标库 (20+ line-style icons)
 │       │   ├── Sidebar.tsx       # 侧边栏 (工作空间列表 + 资源管理)
-│       │   ├── Terminal.tsx      # 终端视图 (xterm 渲染 + Warp 风格输入框)
+│       │   ├── Terminal.tsx      # 终端视图 (xterm 渲染 + 输入框 + Action Bar)
 │       │   └── StatusBar.tsx     # 底部状态栏
 │       ├── hooks/
-│       │   ├── useTerminal.ts    # Terminal 实例池 + 快照恢复 + 尺寸同步
+│       │   ├── useTerminal.ts    # Terminal 实例池 + WebGL + 智能滚动 + 批处理
 │       │   └── useWebSocket.ts   # WebSocket 连接管理 + 自动重连
 │       ├── store/
 │       │   └── sessionStore.ts   # Zustand 全局状态
@@ -103,41 +108,49 @@ cd frontend && npm run build
 Browser                          Server
 ┌─────────────┐    WebSocket    ┌──────────────────┐
 │  xterm.js   │◄──────────────►│  ws-handler.ts   │
-│  (只读渲染)  │    JSON 消息    │  (消息路由)       │
+│  (WebGL 渲染)│    JSON 消息    │  (消息路由)       │
 └─────────────┘                 └──────────────────┘
        ▲                               │
-       │ CustomEvent                   ▼
-       ▼                         ┌──────────────────┐
-┌─────────────┐                  │ session-manager  │
-│  HTML Input │                  │  - PTY 进程池    │
-│  (Warp 风格) │                  │  - Buffer Cache  │
-└─────────────┘                  │  - 工作空间管理   │
-                                 └──────────────────┘
-                                        │
-                                        ▼
-                                 ┌──────────────────┐
-                                 │  node-pty        │
-                                 │  (Claude/Shell)  │
-                                 └──────────────────┘
+       │                               ▼
+┌─────────────┐                 ┌──────────────────┐
+│  HTML Input │                 │ session-manager  │
+│  (文本 + IME)│                 │  - PTY 进程池    │
+└─────────────┘                 │  - Buffer Cache  │
+                                │  - 工作空间管理   │
+                                └──────────────────┘
+                                       │
+                                       ▼
+                                ┌──────────────────┐
+                                │  node-pty        │
+                                │  (Claude/Shell)  │
+                                └──────────────────┘
 ```
 
 ### 关键设计决策
 
-**1. xterm.js 只读模式 + 独立输入框**
+**1. xterm.js WebGL 渲染器 + 独立输入框**
 
-xterm.js 设置 `disableStdin: true`，仅作为输出渲染器。用户输入通过独立的 HTML textarea 捕获，经 WebSocket 发送到后端写入 PTY。这解决了移动端中文 IME 输入的兼容性问题。
+xterm.js 使用 `@xterm/addon-webgl` 启用 GPU 加速渲染，帧率远超默认 Canvas 渲染器。用户输入通过独立的 HTML textarea 捕获，支持中文 IME。特殊键（Tab / Esc / Shift+Tab / Ctrl+C）实时转发到 PTY。
 
-**2. PTY 尺寸先于快照重放**
+**2. 斜杠命令同步**
+
+当用户在输入框输入 `/` 时，字符实时发送到 PTY，触发 Claude Code 的补全菜单。后续输入和退格也同步到 PTY，保持浏览器输入框和终端的联动。
+
+**3. PTY 尺寸先于快照重放**
 
 切换终端时，前端先发送当前终端的实际 cols/rows，后端先调用 `pty.resize()` 调整 PTY 尺寸，再重放缓存的 ANSI 快照。这确保了 ANSI 光标定位序列与前端渲染网格精确对齐。
 
-**3. 原始 Chunk 缓存**
+**4. 原始 Chunk 缓存**
 
 Buffer Cache 以 PTY 原始输出 chunk 为单位存储，不按换行符切割。这避免了 ANSI 逃逸序列被截断导致的渲染损坏。
 
-**4. 双层布局沙盒**
+**5. 写入批处理**
 
-终端渲染区使用 `absolute inset-0` 绝对定位死锁在 `flex-1 min-h-0` 的外层容器内，防止 xterm.js canvas 撑破父级 flex 布局。
+PTY 输出通过 `requestAnimationFrame` 收集，在每帧内批量写入 xterm.js，减少重绘次数。
+
+**6. 智能滚动**
+
+写入前检测用户是否在底部附近（80px 容差），只有用户本来就在底部时才自动滚动，上翻查看历史时不打断。
 
 ## WebSocket 协议
 
