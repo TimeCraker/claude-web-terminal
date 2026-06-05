@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
-import { WebLinksAddon } from '@xterm/addon-web-links';
+import { WebglAddon } from '@xterm/addon-webgl';
 import { useSessionStore } from '../store/sessionStore';
 import { ClientMessage, ServerMessage, TerminalSnapshot } from '../types';
 import { wsSessionId } from './useWebSocket';
@@ -41,8 +41,11 @@ interface TerminalInstance {
   lastCols: number;
   lastRows: number;
   resizeTimer: number | null;
-  /** 已成功 subscribe 的 WS 会话 ID，0 表示未订阅 */
   subscribedWsSession: number;
+  /** 写入批处理缓冲区 */
+  writeBuffer: string;
+  /** rAF ID，非 0 表示有待刷新的写入 */
+  writeRafId: number;
 }
 
 const terminalPool = new Map<string, TerminalInstance>();
@@ -136,7 +139,6 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
         return;
       }
       if (!subscribe(instance) && attempt < 50) {
-        // WS 尚未就绪，消息已入队；稍后重试以更新 subscribedWsSession
         window.setTimeout(() => subscribeWhenReady(instance, attempt + 1), 100);
       }
     },
@@ -166,14 +168,23 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
         cursorBlink: false,
         cursorStyle: 'bar',
         cursorWidth: 2,
-        scrollback: 10000,
+        scrollback: 5000,
         allowTransparency: false,
         disableStdin: true,
+        smoothScrollDuration: 0,    // 禁用平滑滚动，减少额外动画开销
       });
 
       const fitAddon = new FitAddon();
       terminal.loadAddon(fitAddon);
-      terminal.loadAddon(new WebLinksAddon());
+
+      // WebGL 渲染器：GPU 加速，帧率远超 Canvas
+      try {
+        const webglAddon = new WebglAddon();
+        terminal.loadAddon(webglAddon);
+      } catch {
+        // WebGL 不可用时回退到 Canvas（自动降级）
+        console.warn('WebGL not available, falling back to canvas renderer');
+      }
 
       const wrapper = document.createElement('div');
       wrapper.className = 'terminal-wrapper';
@@ -192,6 +203,8 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
         lastRows: 0,
         resizeTimer: null,
         subscribedWsSession: 0,
+        writeBuffer: '',
+        writeRafId: 0,
       };
 
       const resizeObserver = new ResizeObserver(() => scheduleResize(instance));
@@ -220,7 +233,6 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       requestAnimationFrame(() => {
         safeFit(instance);
 
-        // WS 会话变化或未订阅 → 必须 subscribe，否则收不到任何 PTY 输出
         if (instance.subscribedWsSession !== currentWsSession) {
           subscribeWhenReady(instance);
         } else {
@@ -235,21 +247,48 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
     [activeResourceId, activeWorkspaceId, ensureTerminal, safeFit, subscribeWhenReady, flushResize]
   );
 
+  // 写入批处理：收集一帧内的所有数据，统一写入，减少重绘次数
   const writeToTerminal = useCallback((resourceId: string, data: string) => {
     const instance = terminalPool.get(resourceId);
-    if (instance) {
-      instance.terminal.write(data);
-      instance.terminal.scrollToBottom();
+    if (!instance) return;
+
+    instance.writeBuffer += data;
+
+    if (instance.writeRafId === 0) {
+      instance.writeRafId = requestAnimationFrame(() => {
+        instance.writeRafId = 0;
+        const buf = instance.writeBuffer;
+        instance.writeBuffer = '';
+        if (!buf) return;
+
+        // 智能滚动：写入前检测用户是否在底部附近
+        const viewport = instance.terminal.element?.querySelector('.xterm-viewport');
+        const wasNearBottom = viewport
+          ? viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80
+          : true;
+
+        instance.terminal.write(buf, () => {
+          if (wasNearBottom) {
+            instance.terminal.scrollToBottom();
+          }
+        });
+      });
     }
   }, []);
 
   const restoreSnapshot = useCallback((resourceId: string, snapshot: TerminalSnapshot) => {
     const instance = terminalPool.get(resourceId);
-    if (instance) {
-      instance.terminal.reset();
-      instance.terminal.write(snapshot.ansiBuffer.join(''));
-      instance.terminal.scrollToBottom();
+    if (!instance) return;
+    // 取消待刷新的写入，避免快照和实时数据混合
+    if (instance.writeRafId !== 0) {
+      cancelAnimationFrame(instance.writeRafId);
+      instance.writeRafId = 0;
+      instance.writeBuffer = '';
     }
+    instance.terminal.reset();
+    instance.terminal.write(snapshot.ansiBuffer.join(''), () => {
+      instance.terminal.scrollToBottom();
+    });
   }, []);
 
   const disposeTerminal = useCallback((resourceId: string) => {
@@ -257,6 +296,9 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
     if (instance) {
       if (instance.resizeTimer !== null) {
         window.clearTimeout(instance.resizeTimer);
+      }
+      if (instance.writeRafId !== 0) {
+        cancelAnimationFrame(instance.writeRafId);
       }
       instance.resizeObserver.disconnect();
       instance.terminal.dispose();

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 
 interface BrandLogoProps {
   size?: number;
@@ -20,7 +20,8 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   showText = false,
   className = '',
 }) => {
-  const svgId = 'brand-logo'; // 唯一 ID 避免多实例冲突
+  const reactId = useId();
+  const svgId = `bl${reactId.replace(/:/g, '')}`;
 
   return (
     <div className={`flex items-center gap-3 ${className}`}>

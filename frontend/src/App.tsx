@@ -131,14 +131,20 @@ const App: React.FC = () => {
 
                 {/* Quick Actions */}
                 <div className="flex gap-3 justify-center">
-                  <div className="px-4 py-2 bg-[#25262C] rounded-xl border border-neutral-800/60 text-xs text-neutral-400 flex items-center gap-2">
+                  <button
+                    onClick={() => sendMessage({ type: 'workspace:quick_create' })}
+                    className="px-4 py-2 bg-[#25262C] rounded-xl border border-neutral-800/60 text-xs text-neutral-400 flex items-center gap-2 hover:text-neutral-200 hover:border-neutral-700 hover:bg-[#2D2E36] transition-all active:scale-95 cursor-pointer"
+                  >
                     <Icon name="zap" size={14} className="text-[#53D8FB]" />
                     <span>Quick create</span>
-                  </div>
-                  <div className="px-4 py-2 bg-[#25262C] rounded-xl border border-neutral-800/60 text-xs text-neutral-400 flex items-center gap-2">
+                  </button>
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="px-4 py-2 bg-[#25262C] rounded-xl border border-neutral-800/60 text-xs text-neutral-400 flex items-center gap-2 hover:text-neutral-200 hover:border-neutral-700 hover:bg-[#2D2E36] transition-all active:scale-95 cursor-pointer"
+                  >
                     <Icon name="plus" size={14} className="text-[#9D4EDD]" />
                     <span>Custom workspace</span>
-                  </div>
+                  </button>
                 </div>
               </div>
             </div>

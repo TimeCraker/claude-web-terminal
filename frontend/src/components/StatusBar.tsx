@@ -1,5 +1,15 @@
 import React from 'react';
 import { useSessionStore } from '../store/sessionStore';
+import { Icon } from './Icon';
+
+const getIconName = (icon: string): string => {
+  const map: Record<string, string> = {
+    terminal: 'terminal', zap: 'zap', wrench: 'wrench', code: 'code',
+    target: 'target', box: 'box', layers: 'layers', sparkles: 'sparkles',
+    folder: 'folder', globe: 'globe', settings: 'settings',
+  };
+  return map[icon] || 'folder';
+};
 
 export const StatusBar: React.FC = () => {
   const { isConnected, activeWorkspaceId, activeResourceId, workspaces } =
@@ -64,7 +74,7 @@ export const StatusBar: React.FC = () => {
 
         {activeWorkspace && (
           <div className="flex items-center gap-2 text-neutral-500">
-            <span>{activeWorkspace.icon}</span>
+            <Icon name={getIconName(activeWorkspace.icon)} size={12} className="text-neutral-500" />
             <span>{activeWorkspace.name}</span>
           </div>
         )}
