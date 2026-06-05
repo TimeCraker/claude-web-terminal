@@ -48,7 +48,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // 选中资源后，在移动端收起抽屉（终端即将占满屏幕）
   const handleSelectResource = (resourceId: string) => {
     setActiveResource(resourceId);
     onClose();
@@ -90,7 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // 桌面端折叠态：仅图标轨道（移动端永不显示，由 hidden lg:flex 控制）
+  // 桌面端折叠态：仅图标轨道
   const collapsedRail = (
     <div
       className={`${
@@ -99,7 +98,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       <button
         onClick={() => setIsCollapsed(false)}
-        className="w-10 h-10 rounded-xl bg-theme-surface-light hover:bg-theme-surface-elevated flex items-center justify-center text-theme-text-secondary hover:text-theme-text transition-all duration-200 mb-4"
+        className="w-10 h-10 rounded-xl bg-theme-surface-light hover:bg-theme-surface-elevated hover-glow flex items-center justify-center text-theme-text-secondary hover:text-theme-text transition-all duration-200 mb-4"
         title="Expand sidebar"
       >
         <Icon name="chevron-right" size={18} />
@@ -113,10 +112,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               setActiveWorkspace(workspace.id);
               setIsCollapsed(false);
             }}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover-glow ${
               activeWorkspaceId === workspace.id
-                ? 'bg-theme-accent/15 border border-theme-accent/20 text-theme-text shadow-[0_0_10px_var(--theme-glow-primary)]'
-                : 'hover:bg-theme-surface-light hover:shadow-[0_0_8px_var(--theme-glow-primary)] text-theme-text-secondary'
+                ? 'glow-active bg-theme-accent/15 border border-theme-accent/20 text-theme-text'
+                : 'hover:bg-theme-surface-light text-theme-text-secondary'
             }`}
             title={workspace.name}
           >
@@ -127,7 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <button
         onClick={() => sendMessage({ type: 'workspace:quick_create' })}
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-white hover:scale-105 transition-all duration-200 mt-4"
+        className="w-10 h-10 rounded-xl flex items-center justify-center text-theme-bg hover:scale-105 hover-glow transition-all duration-200 mt-4"
         style={{ background: 'linear-gradient(to right, var(--theme-gradient-from), var(--theme-gradient-to))' }}
         title="Quick Create Workspace"
       >
@@ -148,7 +147,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {collapsedRail}
 
-      {/* 展开面板：桌面常驻 + 移动端抽屉 */}
+      {/* 展开面板 */}
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-50 w-72 max-w-[82vw] lg:max-w-none
           bg-theme-surface border-r border-theme-border flex flex-col h-full
@@ -159,7 +158,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Header */}
         <div className="p-4 border-b border-theme-border flex items-center justify-between flex-shrink-0">
           <BrandLogo size={32} showText />
-          {/* 桌面端折叠按钮 */}
           <button
             onClick={() => setIsCollapsed(true)}
             className="hidden lg:flex w-8 h-8 rounded-lg bg-theme-surface-light hover:bg-theme-surface-elevated items-center justify-center text-theme-text-muted hover:text-theme-text-secondary transition-all duration-200"
@@ -167,7 +165,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Icon name="chevron-left" size={16} />
           </button>
-          {/* 移动端关闭按钮 */}
           <button
             onClick={onClose}
             className="lg:hidden w-8 h-8 rounded-lg bg-theme-surface-light flex items-center justify-center text-theme-text-secondary active:scale-95"
@@ -189,10 +186,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {workspaces.map((workspace) => (
             <div key={workspace.id}>
               <div
-                className={`group w-full text-left px-4 py-3 rounded-xl transition-all duration-300 ${
+                className={`group w-full text-left px-4 py-3 rounded-xl transition-all duration-300 hover-glow ${
                   activeWorkspaceId === workspace.id
-                    ? 'bg-theme-surface-light border border-theme-border-strong shadow-[0_0_12px_var(--theme-glow-primary)]'
-                    : 'hover:bg-theme-surface-light hover:shadow-[0_0_10px_var(--theme-glow-primary)] border border-transparent hover:border-theme-border'
+                    ? 'glow-active bg-theme-surface-light border border-theme-border-strong'
+                    : 'hover:bg-theme-surface-light border border-transparent hover:border-theme-border'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -244,10 +241,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {workspace.resources.map((resource) => (
                     <div
                       key={resource.id}
-                      className={`group flex items-center gap-1 px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+                      className={`group flex items-center gap-1 px-3 py-2 rounded-lg text-sm transition-all duration-200 hover-glow ${
                         activeResourceId === resource.id
-                          ? 'bg-theme-surface-light text-theme-text border border-theme-border-strong shadow-[0_0_8px_var(--theme-glow-primary)]'
-                          : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light hover:shadow-[0_0_8px_var(--theme-glow-primary)] border border-transparent hover:border-theme-border'
+                          ? 'glow-active bg-theme-surface-light text-theme-text border border-theme-border-strong'
+                          : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border'
                       }`}
                     >
                       <button
@@ -289,7 +286,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         key={type}
                         onClick={() => handleCreateResourceAndClose(workspace.id, type)}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 bg-theme-surface-light/30 hover:bg-theme-surface-light/60 rounded-md transition-all group/btn"
+                        className="w-full flex items-center gap-2 px-2 py-1.5 bg-theme-surface-light/30 hover:bg-theme-surface-light/60 hover-glow rounded-md transition-all group/btn"
                         title={`New ${type}`}
                       >
                         <Icon
@@ -319,7 +316,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex gap-2">
             <button
               onClick={() => sendMessage({ type: 'workspace:quick_create' })}
-              className="flex-1 px-4 py-2.5 text-theme-bg rounded-xl text-sm font-semibold hover:scale-[1.02] hover:shadow-[0_0_14px_var(--theme-glow-primary)] transition-all duration-300 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2.5 text-theme-bg rounded-xl text-sm font-semibold hover:scale-[1.02] hover-glow transition-all duration-300 flex items-center justify-center gap-2"
               style={{ background: 'linear-gradient(to right, var(--theme-gradient-from), var(--theme-gradient-to))' }}
               title="Quick Create Workspace"
             >
@@ -328,7 +325,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
             <button
               onClick={() => setIsCreating((v) => !v)}
-              className="flex-1 px-4 py-2.5 bg-theme-text text-theme-bg rounded-xl text-sm font-semibold hover:scale-[1.02] hover:shadow-[0_0_14px_var(--theme-glow-primary)] transition-all duration-300 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2.5 bg-theme-text text-theme-bg rounded-xl text-sm font-semibold hover:scale-[1.02] hover-glow transition-all duration-300 flex items-center justify-center gap-2"
             >
               <Icon name="plus" size={14} />
               <span>Custom</span>
@@ -338,7 +335,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Settings Button */}
           <button
             onClick={openSettings}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-theme-surface-light hover:bg-theme-surface-elevated hover:shadow-[0_0_10px_var(--theme-glow-primary)] rounded-xl text-sm text-theme-text-secondary hover:text-theme-text transition-all duration-200 hover:border-theme-border border border-transparent"
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-theme-surface-light hover:bg-theme-surface-elevated hover-glow rounded-xl text-sm text-theme-text-secondary hover:text-theme-text transition-all duration-200 border border-transparent hover:border-theme-border"
           >
             <Icon name="settings" size={14} />
             <span>设置</span>

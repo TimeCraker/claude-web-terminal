@@ -28,8 +28,8 @@ const ThemeCard: React.FC<{
       onClick={() => onSelect(theme.id)}
       className={`group relative w-full text-left rounded-xl p-4 transition-all duration-300 border ${
         isActive
-          ? 'border-theme-accent/50 shadow-[0_0_14px_var(--theme-glow-primary)] scale-[1.02]'
-          : 'border-theme-border hover:border-theme-border-strong hover:shadow-[0_0_12px_var(--theme-glow-primary)] hover:scale-[1.01]'
+          ? 'border-theme-accent/50 glow-active hover-glow scale-[1.02]'
+          : 'border-theme-border hover:border-theme-border-strong hover-glow hover:scale-[1.01]'
       }`}
       style={{ background: c.surface }}
     >
@@ -100,7 +100,7 @@ const FontOption: React.FC<{
     className={`w-full text-left px-4 py-3 rounded-xl transition-all duration-200 border ${
       isActive
         ? 'bg-theme-surface-light border-theme-accent/40 shadow-theme-glow'
-        : 'bg-theme-surface border-theme-border hover:border-theme-border-strong hover:bg-theme-surface-light hover:shadow-[0_0_10px_var(--theme-glow-primary)]'
+        : 'bg-theme-surface border-theme-border hover:border-theme-border-strong hover:bg-theme-surface-light hover-glow'
     }`}
   >
     <div className="flex items-center justify-between">

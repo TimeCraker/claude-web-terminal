@@ -138,3 +138,17 @@ html.theme-transitioning *::after {
 .animate-pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
 }
+
+/* ============================================================
+   Hover Glow Effect — 主题色光晕交互
+   ============================================================ */
+.hover-glow {
+  box-shadow: none;
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease;
+}
+.hover-glow:hover {
+  box-shadow: 0 0 16px 2px var(--theme-glow-primary), 0 0 4px 0 var(--theme-glow-primary);
+}
+.hover-glow.glow-active {
+  box-shadow: 0 0 16px 2px var(--theme-glow-primary), 0 0 4px 0 var(--theme-glow-primary);
+}
