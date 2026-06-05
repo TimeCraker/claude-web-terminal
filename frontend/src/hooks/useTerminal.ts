@@ -4,8 +4,8 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useSessionStore } from '../store/sessionStore';
 import { ClientMessage, ServerMessage, TerminalSnapshot } from '../types';
+import { wsSessionId } from './useWebSocket';
 
-// Warp Phenomenon 主题
 const WARP_THEME = {
   background: '#1C1D22',
   foreground: '#E4E6EB',
@@ -36,13 +36,26 @@ interface TerminalInstance {
   container: HTMLDivElement;
   wrapper: HTMLDivElement;
   resizeObserver: ResizeObserver;
+  workspaceId: string;
+  resourceId: string;
+  lastCols: number;
+  lastRows: number;
+  resizeTimer: number | null;
+  /** 已成功 subscribe 的 WS 会话 ID，0 表示未订阅 */
+  subscribedWsSession: number;
 }
 
-// 全局 Terminal 实例池
 const terminalPool = new Map<string, TerminalInstance>();
+let currentWsSession = 0;
 
 interface UseTerminalOptions {
-  sendMessage: (message: ClientMessage) => void;
+  sendMessage: (message: ClientMessage) => boolean | void;
+}
+
+export function resetAllTerminalSubscriptions(): void {
+  terminalPool.forEach((instance) => {
+    instance.subscribedWsSession = 0;
+  });
 }
 
 export function useTerminal({ sendMessage }: UseTerminalOptions) {
@@ -50,172 +63,201 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
   const sendMessageRef = useRef(sendMessage);
   sendMessageRef.current = sendMessage;
 
-  // 创建或获取 Terminal 实例
+  const safeFit = useCallback((instance: TerminalInstance): boolean => {
+    const { clientWidth, clientHeight } = instance.container;
+    if (clientWidth <= 0 || clientHeight <= 0) return false;
+    try {
+      instance.fitAddon.fit();
+      return instance.terminal.cols > 0 && instance.terminal.rows > 0;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const flushResize = useCallback((instance: TerminalInstance) => {
+    const { cols, rows } = instance.terminal;
+    if (cols <= 0 || rows <= 0) return;
+    if (cols === instance.lastCols && rows === instance.lastRows) return;
+    instance.lastCols = cols;
+    instance.lastRows = rows;
+    sendMessageRef.current({
+      type: 'resource:resize',
+      workspaceId: instance.workspaceId,
+      resourceId: instance.resourceId,
+      cols,
+      rows,
+    });
+  }, []);
+
+  const scheduleResize = useCallback(
+    (instance: TerminalInstance) => {
+      if (instance.resizeTimer !== null) {
+        window.clearTimeout(instance.resizeTimer);
+      }
+      instance.resizeTimer = window.setTimeout(() => {
+        instance.resizeTimer = null;
+        if (safeFit(instance)) {
+          flushResize(instance);
+        }
+      }, 150);
+    },
+    [safeFit, flushResize]
+  );
+
+  const subscribe = useCallback(
+    (instance: TerminalInstance): boolean => {
+      safeFit(instance);
+      const { cols, rows } = instance.terminal;
+      if (cols > 0 && rows > 0) {
+        instance.lastCols = cols;
+        instance.lastRows = rows;
+      }
+      const ok = sendMessageRef.current({
+        type: 'resource:subscribe',
+        workspaceId: instance.workspaceId,
+        resourceId: instance.resourceId,
+        cols: cols > 0 ? cols : undefined,
+        rows: rows > 0 ? rows : undefined,
+      });
+      if (ok !== false) {
+        instance.subscribedWsSession = currentWsSession;
+      }
+      return ok !== false;
+    },
+    [safeFit]
+  );
+
+  const subscribeWhenReady = useCallback(
+    (instance: TerminalInstance, attempt = 0) => {
+      safeFit(instance);
+      const { cols, rows } = instance.terminal;
+      if ((cols <= 0 || rows <= 0) && attempt < 40) {
+        requestAnimationFrame(() => subscribeWhenReady(instance, attempt + 1));
+        return;
+      }
+      if (!subscribe(instance) && attempt < 50) {
+        // WS 尚未就绪，消息已入队；稍后重试以更新 subscribedWsSession
+        window.setTimeout(() => subscribeWhenReady(instance, attempt + 1), 100);
+      }
+    },
+    [safeFit, subscribe]
+  );
+
   const ensureTerminal = useCallback(
     (container: HTMLDivElement, resourceId: string, workspaceId: string): TerminalInstance => {
-      // 如果已存在，检查是否需要移动
       const existing = terminalPool.get(resourceId);
       if (existing) {
         if (existing.container !== container) {
           container.appendChild(existing.wrapper);
           existing.container = container;
-          requestAnimationFrame(() => {
-            try {
-              existing.fitAddon.fit();
-              existing.terminal.focus();
-            } catch {}
-          });
+          existing.resizeObserver.disconnect();
+          existing.resizeObserver.observe(container);
         }
+        existing.workspaceId = workspaceId;
         return existing;
       }
 
-      // 创建新 Terminal - 只读模式
       const terminal = new Terminal({
         theme: WARP_THEME,
         fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace",
         fontSize: 14,
-        lineHeight: 1.3,
+        lineHeight: 1.0,
         letterSpacing: 0,
-        cursorBlink: false,  // 关闭光标闪烁
+        cursorBlink: false,
         cursorStyle: 'bar',
         cursorWidth: 2,
         scrollback: 10000,
-        allowTransparency: true,
-        smoothScrollDuration: 100,
-        scrollSensitivity: 1,
-        minimumContrastRatio: 4.5,
-        drawBoldTextInBrightColors: true,
-        convertEol: true,
-        disableStdin: true,  // 禁用标准输入，降级为只读渲染器
+        allowTransparency: false,
+        disableStdin: true,
       });
 
       const fitAddon = new FitAddon();
-      const webLinksAddon = new WebLinksAddon();
-
       terminal.loadAddon(fitAddon);
-      terminal.loadAddon(webLinksAddon);
+      terminal.loadAddon(new WebLinksAddon());
 
-      // 创建包装容器 - 关键：relative + overflow-hidden 形成沙盒
       const wrapper = document.createElement('div');
       wrapper.className = 'terminal-wrapper';
-      wrapper.style.cssText = `
-        width: 100%;
-        height: 100%;
-        position: relative;
-        overflow: hidden;
-      `;
       container.appendChild(wrapper);
-
       terminal.open(wrapper);
-
-      // 延迟 fit
-      requestAnimationFrame(() => {
-        try {
-          fitAddon.fit();
-        } catch {}
-      });
-
-      // 只读模式，不需要 onData 监听
-
-      // 监听 resize
-      const handleResize = () => {
-        try {
-          fitAddon.fit();
-          const { cols, rows } = terminal;
-          if (cols > 0 && rows > 0) {
-            sendMessageRef.current({
-              type: 'resource:resize',
-              workspaceId,
-              resourceId,
-              cols,
-              rows,
-            });
-          }
-        } catch {}
-      };
-
-      const resizeObserver = new ResizeObserver(() => {
-        requestAnimationFrame(handleResize);
-      });
-      resizeObserver.observe(container);
 
       const instance: TerminalInstance = {
         terminal,
         fitAddon,
         container,
         wrapper,
-        resizeObserver,
+        resizeObserver: null as unknown as ResizeObserver,
+        workspaceId,
+        resourceId,
+        lastCols: 0,
+        lastRows: 0,
+        resizeTimer: null,
+        subscribedWsSession: 0,
       };
 
-      terminalPool.set(resourceId, instance);
+      const resizeObserver = new ResizeObserver(() => scheduleResize(instance));
+      resizeObserver.observe(container);
+      instance.resizeObserver = resizeObserver;
 
-      // 请求订阅 —— 带上当前终端尺寸，让后端先 resize PTY 再重放快照
-      requestAnimationFrame(() => {
-        try {
-          fitAddon.fit();
-        } catch {}
-        const { cols, rows } = terminal;
-        sendMessageRef.current({
-          type: 'resource:subscribe',
-          workspaceId,
-          resourceId,
-          cols: cols > 0 ? cols : undefined,
-          rows: rows > 0 ? rows : undefined,
-        });
-      });
+      terminalPool.set(resourceId, instance);
+      requestAnimationFrame(() => safeFit(instance));
 
       return instance;
     },
-    []
+    [safeFit, scheduleResize]
   );
 
-  // 切换显示的 Terminal
   const switchTerminal = useCallback(
     (container: HTMLDivElement) => {
       if (!activeResourceId || !activeWorkspaceId) return;
 
-      // 隐藏所有 Terminal
       terminalPool.forEach((instance, id) => {
-        if (id !== activeResourceId) {
-          instance.wrapper.style.display = 'none';
-        }
+        instance.wrapper.style.display = id === activeResourceId ? 'block' : 'none';
       });
 
-      // 显示或创建当前 Terminal
       const instance = ensureTerminal(container, activeResourceId, activeWorkspaceId);
       instance.wrapper.style.display = 'block';
 
       requestAnimationFrame(() => {
+        safeFit(instance);
+
+        // WS 会话变化或未订阅 → 必须 subscribe，否则收不到任何 PTY 输出
+        if (instance.subscribedWsSession !== currentWsSession) {
+          subscribeWhenReady(instance);
+        } else {
+          flushResize(instance);
+        }
+
         try {
-          instance.fitAddon.fit();
           instance.terminal.focus();
         } catch {}
       });
     },
-    [activeResourceId, activeWorkspaceId, ensureTerminal]
+    [activeResourceId, activeWorkspaceId, ensureTerminal, safeFit, subscribeWhenReady, flushResize]
   );
 
-  // 写入数据到指定 Terminal
   const writeToTerminal = useCallback((resourceId: string, data: string) => {
     const instance = terminalPool.get(resourceId);
     if (instance) {
       instance.terminal.write(data);
+      instance.terminal.scrollToBottom();
     }
   }, []);
 
-  // 恢复快照 —— 直接拼接原始 chunk，不插入额外的 \r\n（原始数据已包含换行符）
   const restoreSnapshot = useCallback((resourceId: string, snapshot: TerminalSnapshot) => {
     const instance = terminalPool.get(resourceId);
     if (instance) {
-      instance.terminal.clear();
+      instance.terminal.reset();
       instance.terminal.write(snapshot.ansiBuffer.join(''));
+      instance.terminal.scrollToBottom();
     }
   }, []);
 
-  // 清理 Terminal 实例
   const disposeTerminal = useCallback((resourceId: string) => {
     const instance = terminalPool.get(resourceId);
     if (instance) {
+      if (instance.resizeTimer !== null) {
+        window.clearTimeout(instance.resizeTimer);
+      }
       instance.resizeObserver.disconnect();
       instance.terminal.dispose();
       instance.wrapper.remove();
@@ -223,20 +265,37 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
     }
   }, []);
 
-  // 强制触发当前活跃 Terminal 的 fit
   const fitTerminal = useCallback(() => {
     if (!activeResourceId) return;
     const instance = terminalPool.get(activeResourceId);
     if (instance) {
       requestAnimationFrame(() => {
-        try {
-          instance.fitAddon.fit();
-        } catch {}
+        if (safeFit(instance)) {
+          flushResize(instance);
+        }
       });
     }
-  }, [activeResourceId]);
+  }, [activeResourceId, safeFit, flushResize]);
 
-  // 处理 WebSocket 资源事件
+  useEffect(() => {
+    currentWsSession = wsSessionId;
+
+    const handleWsConnected = (event: Event) => {
+      currentWsSession = (event as CustomEvent<number>).detail;
+      resetAllTerminalSubscriptions();
+
+      if (activeResourceId && activeWorkspaceId) {
+        const instance = terminalPool.get(activeResourceId);
+        if (instance) {
+          subscribeWhenReady(instance);
+        }
+      }
+    };
+
+    window.addEventListener('ws:connected', handleWsConnected);
+    return () => window.removeEventListener('ws:connected', handleWsConnected);
+  }, [activeResourceId, activeWorkspaceId, subscribeWhenReady]);
+
   useEffect(() => {
     const handleResourceEvent = (event: Event) => {
       const message = (event as CustomEvent<ServerMessage>).detail;

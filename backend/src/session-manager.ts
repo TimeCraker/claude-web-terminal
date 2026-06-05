@@ -14,8 +14,14 @@ import {
 // 默认配置
 const DEFAULT_CLAUDE_COMMAND = 'claude';
 const DEFAULT_SHELL = process.platform === 'win32' ? 'powershell.exe' : 'bash';
-const MAX_BUFFER_LINES = 5000;
-const BASE_PROJECT_DIR = '/home/ubuntu/project';
+const MAX_BUFFER_CHUNKS = 5000;
+const BASE_PROJECT_DIR = process.env.PROJECT_BASE_DIR || '/home/ubuntu/project';
+const DATA_FILE =
+  process.env.WORKSPACE_DATA_FILE || path.join(BASE_PROJECT_DIR, '.workspaces.json');
+
+// 匹配“整屏清除/复位”序列：RIS(\x1bc)、清屏(\x1b[2J)、清回滚(\x1b[3J)
+// 一旦出现，说明屏幕被重绘，之前缓存的历史（含 resize 期间的脏帧）即可安全丢弃
+const SCREEN_RESET_RE = /\x1bc|\x1b\[[0-3]?J/;
 
 export class SessionManager {
   private workspaces: Map<string, Workspace> = new Map();
@@ -23,7 +29,60 @@ export class SessionManager {
   private outputListeners: Map<string, (data: string) => void> = new Map();
 
   constructor() {
+    this.loadFromDisk();
     console.log('🚀 SessionManager initialized');
+  }
+
+  // ==================== 持久化 ====================
+
+  /** 仅持久化工作空间元数据（PTY 进程无法跨重启存活，重启后资源清空） */
+  private persist(): void {
+    try {
+      const data = Array.from(this.workspaces.values()).map((ws) => ({
+        id: ws.id,
+        name: ws.name,
+        path: ws.path,
+        icon: ws.icon,
+        color: ws.color,
+        createdAt: ws.createdAt,
+        lastOpenedAt: ws.lastOpenedAt,
+        settings: ws.settings,
+      }));
+      fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
+      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('⚠️ Failed to persist workspaces:', (e as Error).message);
+    }
+  }
+
+  private loadFromDisk(): void {
+    try {
+      if (!fs.existsSync(DATA_FILE)) return;
+      const raw = fs.readFileSync(DATA_FILE, 'utf-8');
+      const data = JSON.parse(raw) as Array<Partial<Workspace>>;
+      for (const ws of data) {
+        if (!ws.id || !ws.name || !ws.path) continue;
+        this.workspaces.set(ws.id, {
+          id: ws.id,
+          name: ws.name,
+          path: ws.path,
+          icon: ws.icon || 'folder',
+          color: ws.color || '#53D8FB',
+          createdAt: ws.createdAt || Date.now(),
+          lastOpenedAt: ws.lastOpenedAt || Date.now(),
+          settings: ws.settings || {
+            workingDirectory: ws.path,
+            defaultTerminal: 'claude',
+            autoStart: false,
+            claudeCommand: DEFAULT_CLAUDE_COMMAND,
+          },
+          resources: [],
+        });
+      }
+      console.log(`💾 Restored ${this.workspaces.size} workspace(s) from disk`);
+    } catch (e) {
+      console.warn('⚠️ Failed to load workspaces:', (e as Error).message);
+    }
   }
 
   // ==================== Workspace 管理 ====================
@@ -52,6 +111,7 @@ export class SessionManager {
       resources: [],
     };
     this.workspaces.set(id, workspace);
+    this.persist();
     console.log(`📁 Workspace created: ${name} (${id})`);
     return workspace;
   }
@@ -124,6 +184,7 @@ export class SessionManager {
     }
 
     this.workspaces.delete(workspaceId);
+    this.persist();
 
     console.log(`🗑️ Workspace deleted: ${workspace.name} (${workspace.resources.length} processes freed)`);
     return true;
@@ -141,6 +202,7 @@ export class SessionManager {
     const workspace = this.workspaces.get(workspaceId);
     if (workspace) {
       workspace.lastOpenedAt = Date.now();
+      this.persist();
     }
   }
 
@@ -262,11 +324,21 @@ export class SessionManager {
       if (resource) {
         // 更新 Buffer Cache —— 保持原始 chunk 完整，不按 \n 切割
         // 这样 ANSI 逃逸码（如 \x1b[2J）不会被截断
-        resource.snapshot.ansiBuffer.push(data);
-
-        // 按 chunk 数量裁剪（而非按行数），保持每个 chunk 的完整性
-        if (resource.snapshot.ansiBuffer.length > MAX_BUFFER_LINES) {
-          resource.snapshot.ansiBuffer = resource.snapshot.ansiBuffer.slice(-MAX_BUFFER_LINES);
+        if (SCREEN_RESET_RE.test(data)) {
+          // 检测到整屏清除/复位：丢弃此前所有历史（含 resize 风暴产生的脏帧），
+          // 仅从最后一次清屏序列开始重建快照 —— 既杜绝脏字符回灌，又显著缩小快照体积
+          const idx = Math.max(
+            data.lastIndexOf('\x1bc'),
+            data.lastIndexOf('\x1b[2J'),
+            data.lastIndexOf('\x1b[3J')
+          );
+          resource.snapshot.ansiBuffer = [idx > 0 ? data.slice(idx) : data];
+        } else {
+          resource.snapshot.ansiBuffer.push(data);
+          // 按 chunk 数量裁剪（而非按行数），保持每个 chunk 的完整性
+          if (resource.snapshot.ansiBuffer.length > MAX_BUFFER_CHUNKS) {
+            resource.snapshot.ansiBuffer = resource.snapshot.ansiBuffer.slice(-MAX_BUFFER_CHUNKS);
+          }
         }
 
         resource.snapshot.lastUpdated = Date.now();
@@ -299,23 +371,86 @@ export class SessionManager {
   }
 
   resizeResource(resourceId: string, cols: number, rows: number): boolean {
-    const pty = this.ptyProcesses.get(resourceId);
-    if (pty) {
-      pty.resize(cols, rows);
+    return this.applyResize(resourceId, cols, rows, false);
+  }
 
-      // 更新 snapshot
-      for (const workspace of this.workspaces.values()) {
-        const resource = workspace.resources.find(r => r.id === resourceId);
-        if (resource) {
-          resource.snapshot.cols = cols;
-          resource.snapshot.rows = rows;
-          break;
-        }
-      }
+  /** 订阅时强制 resize（即使尺寸相同），触发 TUI 整屏重绘 */
+  forceResizeResource(resourceId: string, cols: number, rows: number): boolean {
+    return this.applyResize(resourceId, cols, rows, true);
+  }
 
-      return true;
+  private applyResize(resourceId: string, cols: number, rows: number, force: boolean): boolean {
+    if (!Number.isFinite(cols) || !Number.isFinite(rows) || cols <= 0 || rows <= 0) {
+      return false;
     }
-    return false;
+
+    const pty = this.ptyProcesses.get(resourceId);
+    if (!pty) return false;
+
+    for (const workspace of this.workspaces.values()) {
+      const resource = workspace.resources.find(r => r.id === resourceId);
+      if (resource) {
+        if (!force && resource.snapshot.cols === cols && resource.snapshot.rows === rows) {
+          return true;
+        }
+        resource.snapshot.cols = cols;
+        resource.snapshot.rows = rows;
+        break;
+      }
+    }
+
+    try {
+      pty.resize(cols, rows);
+    } catch (e) {
+      console.warn(`⚠️ resize failed for ${resourceId}:`, (e as Error).message);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * 获取可安全重放的快照 —— 仅保留最后一次清屏/进备用屏之后的内容，
+   * 且要求与前端当前行列一致，避免 TUI 光标定位错位。
+   */
+  getSafeSnapshot(resourceId: string, cols?: number, rows?: number): TerminalSnapshot | null {
+    const raw = this.getResourceSnapshot(resourceId);
+    if (!raw || raw.ansiBuffer.length === 0) return null;
+
+    if (cols && rows && cols > 0 && rows > 0) {
+      if (raw.cols !== cols || raw.rows !== rows) {
+        return null;
+      }
+    }
+
+    const joined = raw.ansiBuffer.join('');
+    const markers = ['\x1bc', '\x1b[2J', '\x1b[3J', '\x1b[?1049h'];
+    let lastIdx = -1;
+    for (const m of markers) {
+      const i = joined.lastIndexOf(m);
+      if (i > lastIdx) lastIdx = i;
+    }
+    const tail = lastIdx >= 0 ? joined.slice(lastIdx) : joined;
+    if (!tail || tail.length < 4) return null;
+
+    return {
+      ...raw,
+      cols: cols && cols > 0 ? cols : raw.cols,
+      rows: rows && rows > 0 ? rows : raw.rows,
+      ansiBuffer: [tail],
+    };
+  }
+
+  /** 强制 TUI 程序（Claude Code 等）重绘整屏 */
+  refreshResource(resourceId: string): boolean {
+    const pty = this.ptyProcesses.get(resourceId);
+    if (!pty) return false;
+    try {
+      process.kill(pty.pid, 'SIGWINCH');
+      return true;
+    } catch (e) {
+      console.warn(`⚠️ refresh failed for ${resourceId}:`, (e as Error).message);
+      return false;
+    }
   }
 
   killResource(resourceId: string): boolean {

@@ -89,7 +89,7 @@ export class WebSocketHandler {
         break;
 
       case 'resource:input':
-        this.handleResourceInput(message.workspaceId, message.resourceId, message.data);
+        this.handleResourceInput(ws, message.workspaceId, message.resourceId, message.data);
         break;
 
       case 'resource:resize':
@@ -194,10 +194,18 @@ export class WebSocketHandler {
       clientInfo.resourceId = resourceId;
     }
 
-    // 关键：先 resize PTY 到前端实际尺寸，再重放快照
-    // 这样 ANSI 光标定位码（如 \x1b[1;1H）才能和前端的行列网格对齐
+    const resource = this.sessionManager.getResource(workspaceId, resourceId);
+    if (!resource) {
+      if (clientInfo) {
+        clientInfo.resourceId = undefined;
+      }
+      this.sendError(ws, 'Session not found — click + Claude to start a new terminal');
+      return;
+    }
+
+    // 订阅时强制 resize，确保 TUI 收到 SIGWINCH 并重绘
     if (cols && rows && cols > 0 && rows > 0) {
-      this.sessionManager.resizeResource(resourceId, cols, rows);
+      this.sessionManager.forceResizeResource(resourceId, cols, rows);
     }
 
     // 订阅新的 resource 输出
@@ -210,19 +218,34 @@ export class WebSocketHandler {
       });
     });
 
-    // 发送 Buffer Cache（快照恢复）—— 此时 PTY 已经是正确的尺寸
-    const snapshot = this.sessionManager.getResourceSnapshot(resourceId);
-    if (snapshot && snapshot.ansiBuffer.length > 0) {
-      this.send(ws, {
-        type: 'resource:snapshot',
-        workspaceId,
-        resourceId,
-        snapshot,
-      });
+    // Claude：只重放「清屏后」的安全快照；若无则靠 force resize 触发重绘
+    if (resource?.type === 'claude') {
+      const safeSnapshot = this.sessionManager.getSafeSnapshot(resourceId, cols, rows);
+      if (safeSnapshot) {
+        this.send(ws, {
+          type: 'resource:snapshot',
+          workspaceId,
+          resourceId,
+          snapshot: safeSnapshot,
+        });
+      } else if (cols && rows && cols > 0 && rows > 0) {
+        this.sessionManager.forceResizeResource(resourceId, cols, rows);
+      } else {
+        this.sessionManager.refreshResource(resourceId);
+      }
+    } else {
+      const snapshot = this.sessionManager.getResourceSnapshot(resourceId);
+      if (snapshot && snapshot.ansiBuffer.length > 0) {
+        this.send(ws, {
+          type: 'resource:snapshot',
+          workspaceId,
+          resourceId,
+          snapshot,
+        });
+      }
     }
 
     // 发送当前状态
-    const resource = this.sessionManager.getResource(workspaceId, resourceId);
     if (resource) {
       this.send(ws, {
         type: 'resource:status',
@@ -233,8 +256,14 @@ export class WebSocketHandler {
     }
   }
 
-  private handleResourceInput(workspaceId: string, resourceId: string, data: string): void {
-    this.sessionManager.writeToResource(resourceId, data);
+  private handleResourceInput(ws: WebSocket, workspaceId: string, resourceId: string, data: string): void {
+    if (!this.sessionManager.getResource(workspaceId, resourceId)) {
+      this.sendError(ws, 'Session not found — click + Claude to start a new terminal');
+      return;
+    }
+    if (!this.sessionManager.writeToResource(resourceId, data)) {
+      this.sendError(ws, 'Failed to send input to terminal');
+    }
   }
 
   private handleResourceResize(workspaceId: string, resourceId: string, cols: number, rows: number): void {

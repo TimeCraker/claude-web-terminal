@@ -189,6 +189,15 @@ export const Icon: React.FC<IconProps> = ({ name, className = '', size = 16 }) =
         </svg>
       );
 
+    case 'menu':
+      return (
+        <svg {...props}>
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      );
+
     default:
       // 默认文件夹图标
       return (

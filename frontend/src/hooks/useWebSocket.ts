@@ -1,15 +1,19 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useSessionStore } from '../store/sessionStore';
-import { ClientMessage, ServerMessage } from '../types';
+import { ClientMessage, ServerMessage, Workspace } from '../types';
 
-// 动态构建 WebSocket URL，支持域名和端口
 const getWsUrl = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host; // 包含端口
+  const host = window.location.host;
   return `${protocol}//${host}/ws`;
 };
 
 const WS_URL = getWsUrl();
+
+/** 每次 WS 连接成功递增，供 terminal 判断是否需要重新 subscribe */
+export let wsSessionId = 0;
+
+const pendingMessages: ClientMessage[] = [];
 
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
@@ -23,17 +27,119 @@ export function useWebSocket() {
     setConnected,
   } = useSessionStore();
 
+  const flushQueue = useCallback(() => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    while (pendingMessages.length > 0) {
+      ws.send(JSON.stringify(pendingMessages.shift()!));
+    }
+  }, []);
+
+  const sendMessage = useCallback((message: ClientMessage): boolean => {
+    const ws = wsRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(message));
+      return true;
+    }
+    pendingMessages.push(message);
+    return false;
+  }, []);
+
+  const syncSelectionWithServer = useCallback((workspaces: Workspace[]) => {
+    const {
+      activeWorkspaceId,
+      activeResourceId,
+      setActiveWorkspace,
+      setActiveResource,
+    } = useSessionStore.getState();
+
+    let workspaceId = activeWorkspaceId;
+    if (!workspaceId && workspaces.length > 0) {
+      workspaceId = workspaces[0].id;
+      setActiveWorkspace(workspaceId);
+    }
+
+    const workspace = workspaces.find((w) => w.id === workspaceId);
+    if (!workspace) return;
+
+    if (activeResourceId && !workspace.resources.some((r) => r.id === activeResourceId)) {
+      setActiveResource(null);
+    }
+
+    const currentResourceId = useSessionStore.getState().activeResourceId;
+    if (!currentResourceId && workspace.resources.length > 0) {
+      setActiveResource(workspace.resources[0].id);
+    }
+  }, []);
+
+  const handleMessage = useCallback(
+    (message: ServerMessage) => {
+      switch (message.type) {
+        case 'workspace:list':
+          setWorkspaces(message.workspaces);
+          syncSelectionWithServer(message.workspaces);
+          break;
+
+        case 'workspace:created':
+          addWorkspace(message.workspace);
+          break;
+
+        case 'workspace:updated':
+          updateWorkspace(message.workspace);
+          syncSelectionWithServer(
+            useSessionStore.getState().workspaces.map((w) =>
+              w.id === message.workspace.id ? message.workspace : w
+            )
+          );
+          break;
+
+        case 'workspace:deleted':
+          removeWorkspace(message.workspaceId);
+          break;
+
+        case 'resource:created':
+          if (message.workspaceId === useSessionStore.getState().activeWorkspaceId) {
+            useSessionStore.getState().setActiveResource(message.resource.id);
+          }
+          window.dispatchEvent(
+            new CustomEvent('ws:resource', { detail: message })
+          );
+          break;
+
+        case 'resource:output':
+        case 'resource:status':
+        case 'resource:snapshot':
+        case 'resource:deleted':
+          window.dispatchEvent(
+            new CustomEvent('ws:resource', { detail: message })
+          );
+          break;
+
+        case 'error':
+          console.error('❌ Server error:', message.message);
+          window.dispatchEvent(
+            new CustomEvent('ws:error', { detail: message.message })
+          );
+          break;
+      }
+    },
+    [setWorkspaces, addWorkspace, updateWorkspace, removeWorkspace, syncSelectionWithServer]
+  );
+
   const connect = useCallback(() => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    console.log('🔌 Connecting to WebSocket...');
     const ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
-      console.log('✅ WebSocket connected');
+      wsSessionId += 1;
       setConnected(true);
+      flushQueue();
 
-      // 请求 workspace 列表
+      window.dispatchEvent(
+        new CustomEvent('ws:connected', { detail: wsSessionId })
+      );
+
       sendMessage({ type: 'workspace:list' });
     };
 
@@ -47,66 +153,19 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
-      console.log('🔌 WebSocket disconnected');
       setConnected(false);
       wsRef.current = null;
-
-      // 自动重连
       reconnectTimeoutRef.current = window.setTimeout(() => {
         connect();
       }, 3000);
     };
 
-    ws.onerror = (error) => {
-      console.error('❌ WebSocket error:', error);
+    ws.onerror = () => {
+      console.error('❌ WebSocket error');
     };
 
     wsRef.current = ws;
-  }, [setConnected, setWorkspaces, addWorkspace, updateWorkspace, removeWorkspace]);
-
-  const handleMessage = useCallback(
-    (message: ServerMessage) => {
-      switch (message.type) {
-        case 'workspace:list':
-          setWorkspaces(message.workspaces);
-          break;
-
-        case 'workspace:created':
-          addWorkspace(message.workspace);
-          break;
-
-        case 'workspace:updated':
-          updateWorkspace(message.workspace);
-          break;
-
-        case 'workspace:deleted':
-          removeWorkspace(message.workspaceId);
-          break;
-
-        case 'resource:created':
-        case 'resource:output':
-        case 'resource:status':
-        case 'resource:snapshot':
-        case 'resource:deleted':
-          // 这些事件由 useTerminal hook 处理
-          window.dispatchEvent(
-            new CustomEvent('ws:resource', { detail: message })
-          );
-          break;
-
-        case 'error':
-          console.error('❌ Server error:', message.message);
-          break;
-      }
-    },
-    [setWorkspaces, addWorkspace, updateWorkspace, removeWorkspace]
-  );
-
-  const sendMessage = useCallback((message: ClientMessage) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(message));
-    }
-  }, []);
+  }, [setConnected, flushQueue, sendMessage, handleMessage]);
 
   useEffect(() => {
     connect();

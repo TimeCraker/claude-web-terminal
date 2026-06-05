@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Terminal } from './components/Terminal';
 import { StatusBar } from './components/StatusBar';
@@ -10,7 +10,11 @@ import { ResourceType } from './types';
 
 const App: React.FC = () => {
   const { sendMessage } = useWebSocket();
-  const { activeResourceId, setActiveResource } = useSessionStore();
+  const { activeResourceId, setActiveResource, workspaces, activeWorkspaceId } =
+    useSessionStore();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
   const handleCreateWorkspace = (name: string, path: string) => {
     const icons = ['terminal', 'folder', 'box', 'wrench', 'target', 'layers', 'globe', 'sparkles'];
@@ -56,9 +60,26 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-[#1C1D22] overflow-hidden">
+    <div className="h-[100dvh] flex flex-col bg-[#1C1D22] overflow-hidden">
+      {/* 移动端顶栏 —— 汉堡菜单 + 当前工作空间 */}
+      <header className="lg:hidden flex-shrink-0 h-14 bg-[#16171B] border-b border-neutral-800/60 flex items-center gap-3 px-3">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="w-10 h-10 rounded-xl bg-[#25262C] flex items-center justify-center text-neutral-300 active:scale-95 transition-transform"
+          aria-label="Open menu"
+        >
+          <Icon name="menu" size={20} />
+        </button>
+        <div className="flex items-center gap-2 min-w-0">
+          <BrandLogo size={24} />
+          <span className="text-sm font-semibold text-neutral-200 truncate">
+            {activeWorkspace ? activeWorkspace.name : 'AI Workspace OS'}
+          </span>
+        </div>
+      </header>
+
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
+      <div className="flex-1 flex overflow-hidden min-h-0 relative">
         {/* Sidebar */}
         <Sidebar
           sendMessage={sendMessage}
@@ -66,12 +87,29 @@ const App: React.FC = () => {
           onCreateResource={handleCreateResource}
           onDeleteWorkspace={handleDeleteWorkspace}
           onDeleteResource={handleDeleteResource}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
         {/* Terminal Area - overflow-hidden 防止 xterm canvas 溢出 */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {activeResourceId ? (
             <Terminal sendMessage={sendMessage} />
+          ) : activeWorkspaceId && activeWorkspace ? (
+            <div className="flex-1 flex items-center justify-center bg-[#1C1D22] px-6">
+              <div className="text-center space-y-4 max-w-md">
+                <h2 className="text-xl font-semibold text-neutral-200">
+                  {activeWorkspace.resources.length === 0
+                    ? 'No active terminal'
+                    : 'Select a terminal'}
+                </h2>
+                <p className="text-sm text-neutral-500 leading-relaxed">
+                  {activeWorkspace.resources.length === 0
+                    ? 'Server restarted and previous sessions ended. Use + Claude in the sidebar to start a new session.'
+                    : 'Pick a session from the sidebar, or create one with + Claude.'}
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-[#1C1D22]">
               <div className="text-center space-y-8">

@@ -21,6 +21,8 @@ body,
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 阻止移动端整页橡皮筋滚动，把滚动行为限制在终端内部 */
+  overscroll-behavior: none;
 }
 
 /* 自定义滚动条 */
@@ -42,26 +44,30 @@ body,
   background: rgba(55, 57, 65, 0.8);
 }
 
-/* xterm.js 容器 */
+/* xterm.js 容器 —— 填满父级，padding 由外层容器承担（避免 FitAddon 算错行列） */
 .terminal-wrapper {
-  position: relative;
+  position: absolute;
+  inset: 0;
   overflow: hidden;
 }
 
 .xterm {
-  padding: 16px;
   height: 100%;
   width: 100%;
+  padding: 0;
 }
 
-.xterm-viewport {
+.xterm .xterm-viewport {
   overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  width: 100% !important;
+  height: 100% !important;
 }
 
-/* xterm screen 容器 */
-.xterm-screen {
+.xterm .xterm-screen {
   position: relative;
-  overflow: hidden;
 }
 
 /* 彻底隐藏 xterm 辅助输入层 —— 防止白块/乱码穿帮 */
@@ -106,14 +112,6 @@ body,
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-}
-
-/* 响应式调整 */
-@media (max-width: 768px) {
-  .xterm {
-    padding: 10px;
-    font-size: 12px;
-  }
 }
 
 /* 按钮激活效果 */
