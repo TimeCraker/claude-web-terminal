@@ -1,4 +1,5 @@
 import React, { useId } from 'react';
+import { useThemeStore } from '../themes/useThemeStore';
 
 interface BrandLogoProps {
   size?: number;
@@ -13,7 +14,7 @@ interface BrandLogoProps {
  * - 六边形 = 工作空间节点（蜂巢结构，无限扩展）
  * - 终端光标 `>_` = 极客精神，命令行核心
  * - AI 神经连接 = 智能工作流
- * - 蓝紫渐变 = 科技感，与 Warp Phenomenon 主题呼应
+ * - 渐变色跟随当前主题 accent
  */
 export const BrandLogo: React.FC<BrandLogoProps> = ({
   size = 40,
@@ -22,6 +23,11 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
 }) => {
   const reactId = useId();
   const svgId = `bl${reactId.replace(/:/g, '')}`;
+  const theme = useThemeStore((s) => s.getTheme());
+
+  const from = theme.colors.gradientFrom;
+  const to = theme.colors.gradientTo;
+  const mid = theme.colors.accentSecondary;
 
   return (
     <div className={`flex items-center gap-3 ${className}`}>
@@ -35,22 +41,22 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         className="flex-shrink-0"
       >
         <defs>
-          {/* 主渐变：蓝 → 紫 */}
+          {/* 主渐变 */}
           <linearGradient id={`${svgId}-gradient`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#53D8FB" />
-            <stop offset="50%" stopColor="#7B6CF6" />
-            <stop offset="100%" stopColor="#9D4EDD" />
+            <stop offset="0%" stopColor={from} />
+            <stop offset="50%" stopColor={mid} />
+            <stop offset="100%" stopColor={to} />
           </linearGradient>
 
           {/* 光晕渐变 */}
           <radialGradient id={`${svgId}-glow`} cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#53D8FB" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#9D4EDD" stopOpacity="0" />
+            <stop offset="0%" stopColor={from} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={to} stopOpacity="0" />
           </radialGradient>
 
           {/* 内部发光 */}
           <radialGradient id={`${svgId}-inner-glow`} cx="40%" cy="35%" r="60%">
-            <stop offset="0%" stopColor="#53D8FB" stopOpacity="0.15" />
+            <stop offset="0%" stopColor={from} stopOpacity="0.15" />
             <stop offset="100%" stopColor="transparent" />
           </radialGradient>
         </defs>
@@ -96,13 +102,13 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         />
 
         {/* AI 神经节点 - 左上 */}
-        <circle cx="20" cy="16" r="2" fill="#53D8FB" opacity="0.8" />
+        <circle cx="20" cy="16" r="2" fill={from} opacity="0.8" />
         {/* AI 神经节点 - 右上 */}
-        <circle cx="44" cy="16" r="2" fill="#9D4EDD" opacity="0.8" />
+        <circle cx="44" cy="16" r="2" fill={to} opacity="0.8" />
         {/* AI 神经节点 - 左下 */}
-        <circle cx="20" cy="48" r="2" fill="#7B6CF6" opacity="0.6" />
+        <circle cx="20" cy="48" r="2" fill={mid} opacity="0.6" />
         {/* AI 神经节点 - 右下 */}
-        <circle cx="44" cy="48" r="2" fill="#53D8FB" opacity="0.6" />
+        <circle cx="44" cy="48" r="2" fill={from} opacity="0.6" />
 
         {/* 神经连接线 - 左上到光标 */}
         <line
@@ -110,7 +116,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           y1="16"
           x2="26"
           y2="26"
-          stroke="#53D8FB"
+          stroke={from}
           strokeWidth="0.8"
           opacity="0.4"
           strokeDasharray="2 2"
@@ -121,7 +127,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           y1="16"
           x2="42"
           y2="28"
-          stroke="#9D4EDD"
+          stroke={to}
           strokeWidth="0.8"
           opacity="0.4"
           strokeDasharray="2 2"
@@ -132,7 +138,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           y1="48"
           x2="26"
           y2="38"
-          stroke="#7B6CF6"
+          stroke={mid}
           strokeWidth="0.8"
           opacity="0.3"
           strokeDasharray="2 2"
@@ -143,7 +149,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           y1="48"
           x2="40"
           y2="36"
-          stroke="#53D8FB"
+          stroke={from}
           strokeWidth="0.8"
           opacity="0.3"
           strokeDasharray="2 2"
@@ -166,13 +172,13 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       {showText && (
         <div className="flex flex-col">
           <span
-            className="text-lg font-bold tracking-tight bg-gradient-to-r from-[#53D8FB] to-[#9D4EDD] bg-clip-text text-transparent"
+            className="text-lg font-bold tracking-tight gradient-text"
             style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
           >
             AI Workspace
           </span>
           <span
-            className="text-[10px] font-medium tracking-[0.2em] uppercase text-neutral-500"
+            className="text-[10px] font-medium tracking-[0.2em] uppercase text-theme-text-muted"
             style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace" }}
           >
             OS

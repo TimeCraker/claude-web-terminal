@@ -2,128 +2,139 @@
 @tailwind components;
 @tailwind utilities;
 
-/* AI Workspace OS - Warp Phenomenon Theme */
+/*
+ * AI Workspace OS - Global Styles
+ * All colors use CSS variables from the theme system.
+ */
 
-* {
+/* ============================================================
+   Default theme variables (overridden by ThemeProvider at runtime)
+   ============================================================ */
+:root {
+  --theme-bg: #1C1D22;
+  --theme-surface: #16171B;
+  --theme-surface-light: #25262C;
+  --theme-surface-elevated: #2D2E36;
+  --theme-border: #2C2E35;
+  --theme-border-strong: #3A3C44;
+  --theme-text: #E4E6EB;
+  --theme-text-secondary: #9CA3AF;
+  --theme-text-muted: #6B7280;
+  --theme-accent-primary: #53D8FB;
+  --theme-accent-secondary: #9D4EDD;
+  --theme-success: #A8E6CF;
+  --theme-warning: #FFD3B6;
+  --theme-error: #FF6B6B;
+  --theme-glow-primary: rgba(83, 216, 251, 0.15);
+  --theme-glow-secondary: rgba(157, 78, 221, 0.15);
+  --theme-gradient-from: #53D8FB;
+  --theme-gradient-to: #9D4EDD;
+  --theme-font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+}
+
+/* ============================================================
+   Base
+   ============================================================ */
+html, body, #root {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
-}
-
-html,
-body,
-#root {
   height: 100%;
   width: 100%;
-  overflow: hidden;
-  background-color: #1C1D22;
-  color: #E4E6EB;
-  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+  background-color: var(--theme-bg);
+  color: var(--theme-text);
+  font-family: var(--theme-font-mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overscroll-behavior: none;
-}
-
-/* 自定义滚动条 */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(44, 46, 53, 0.6);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(55, 57, 65, 0.8);
-}
-
-/* xterm.js 容器 */
-.terminal-wrapper {
-  position: absolute;
-  inset: 0;
   overflow: hidden;
-  will-change: transform;
-  transform: translateZ(0);
 }
 
-.xterm {
-  height: 100%;
-  width: 100%;
-  padding: 0;
+/* Smooth theme transitions */
+html.theme-transitioning,
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease !important;
 }
 
-.xterm .xterm-viewport {
-  overflow-y: auto !important;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  touch-action: pan-y;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.xterm .xterm-screen {
-  position: relative;
-  top: 0 !important;
-}
-
-/* xterm 辅助 textarea：隐藏视觉但保留选区/复制功能 */
-.xterm-helper-textarea {
-  opacity: 0 !important;
-  caret-color: transparent !important;
-  border: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  resize: none !important;
-  outline: none !important;
-  background: transparent !important;
-  color: transparent !important;
-  -webkit-appearance: none !important;
-  /* 不设 pointer-events:none，让 xterm 能接收选区/复制事件 */
-}
-
-/* 选择文本样式 */
-.xterm .xterm-selection {
-  opacity: 1;
-}
-
-.xterm .xterm-selection div {
-  background: rgba(83, 216, 251, 0.15) !important;
-}
-
-/* 渐变文字 */
+/* ============================================================
+   Gradient Text
+   ============================================================ */
 .gradient-text {
-  background: linear-gradient(135deg, #53D8FB, #9D4EDD);
+  background: linear-gradient(135deg, var(--theme-gradient-from), var(--theme-gradient-to));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
-/* 隐藏滚动条但保留滚动功能 */
-.scrollbar-none::-webkit-scrollbar {
-  display: none;
+/* ============================================================
+   Scrollbar
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
-.scrollbar-none {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--theme-border-strong);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--theme-text-muted);
 }
 
-/* 按钮激活效果 */
-button:active:not(:disabled) {
-  transform: scale(0.98);
+/* Tailwind-compatible scrollbar utility */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--theme-border-strong) transparent;
 }
 
-/* 输入框 placeholder */
-input::placeholder {
-  color: #6B7280;
+/* ============================================================
+   xterm.js overrides
+   ============================================================ */
+.xterm {
+  padding: 12px;
+  height: 100%;
 }
 
-/* 焦点环 */
-input:focus {
-  outline: none;
+.xterm-viewport::-webkit-scrollbar {
+  width: 6px;
+}
+
+.xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.xterm-viewport::-webkit-scrollbar-thumb {
+  background: var(--theme-border-strong);
+  border-radius: 3px;
+}
+
+/* ============================================================
+   Focus ring
+   ============================================================ */
+*:focus-visible {
+  outline: 2px solid var(--theme-accent-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   Selection
+   ============================================================ */
+::selection {
+  background: var(--theme-glow-primary);
+  color: var(--theme-text);
+}
+
+/* ============================================================
+   Animations
+   ============================================================ */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
 }
