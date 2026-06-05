@@ -19,10 +19,11 @@ export const TopBar: React.FC<TopBarProps> = ({ onToggleSidebar, isSidebarOpen }
       {/* 侧边栏切换按钮 */}
       <button
         onClick={onToggleSidebar}
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light transition-all hover-glow"
+        className="w-8 h-8 rounded-[6px] flex items-center justify-center text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light transition-all duration-200 hover-glow"
         aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
+        title={isSidebarOpen ? '折叠侧边栏' : '展开侧边栏'}
       >
-        <Icon name={isSidebarOpen ? 'chevron-left' : 'menu'} size={18} />
+        <Icon name={isSidebarOpen ? 'sidebar-open' : 'sidebar-close'} size={18} />
       </button>
 
       {/* 全局搜索框（半透明圆角） */}

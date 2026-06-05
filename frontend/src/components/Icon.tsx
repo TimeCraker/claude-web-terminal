@@ -198,6 +198,32 @@ export const Icon: React.FC<IconProps> = ({ name, className = '', size = 16 }) =
         </svg>
       );
 
+    case 'sidebar':
+      return (
+        <svg {...props}>
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <line x1="9" y1="3" x2="9" y2="21" />
+        </svg>
+      );
+
+    case 'sidebar-open':
+      return (
+        <svg {...props}>
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <line x1="9" y1="3" x2="9" y2="21" />
+          <polyline points="15 9 12 12 15 15" />
+        </svg>
+      );
+
+    case 'sidebar-close':
+      return (
+        <svg {...props}>
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+          <line x1="9" y1="3" x2="9" y2="21" />
+          <polyline points="12 9 15 12 12 15" />
+        </svg>
+      );
+
     default:
       // 默认文件夹图标
       return (
