@@ -1,248 +1,373 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { Terminal as XTerminal } from '@xterm/xterm';
+import { useEffect, useCallback, useRef } from 'react';
+import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
-import { WebLinksAddon } from '@xterm/addon-web-links';
 import { useSessionStore } from '../store/sessionStore';
 import { useThemeStore } from '../themes/useThemeStore';
-import type { XtermTheme } from '../themes/definitions';
-import type { ClientMessage } from '../types';
+import { ClientMessage, ServerMessage, TerminalSnapshot } from '../types';
+import { wsSessionId } from './useWebSocket';
 
-interface UseTerminalOptions {
-  sendMessage: (message: ClientMessage) => void;
-}
-
-// 终端实例缓存（不随 React re-render 销毁）
-const terminalPool = new Map<string, XTerminal>();
-const fitAddonPool = new Map<string, FitAddon>();
-let activeTerminalId: string | null = null;
-
-// 每行独立写入，严格保留原有输出，新输出追加到末尾
-const outputBuffer = new Map<string, string[]>();
-const pendingWrites = new Map<string, number>();
-
-function getThemeColors(): XtermTheme {
+function getTheme() {
   return useThemeStore.getState().getTheme().xterm;
 }
 
-function getFontFamily(): string {
+function getFontFamily() {
   return useThemeStore.getState().getFont().family;
 }
 
-function getFontSize(): number {
-  return 14;
+interface TerminalInstance {
+  terminal: Terminal;
+  fitAddon: FitAddon;
+  container: HTMLDivElement;
+  wrapper: HTMLDivElement;
+  resizeObserver: ResizeObserver;
+  workspaceId: string;
+  resourceId: string;
+  lastCols: number;
+  lastRows: number;
+  resizeTimer: number | null;
+  subscribedWsSession: number;
+  /** 写入批处理缓冲区 */
+  writeBuffer: string;
+  /** rAF ID，非 0 表示有待刷新的写入 */
+  writeRafId: number;
+}
+
+const terminalPool = new Map<string, TerminalInstance>();
+let currentWsSession = 0;
+
+interface UseTerminalOptions {
+  sendMessage: (message: ClientMessage) => boolean | void;
+}
+
+export function resetAllTerminalSubscriptions(): void {
+  terminalPool.forEach((instance) => {
+    instance.subscribedWsSession = 0;
+  });
 }
 
 export function useTerminal({ sendMessage }: UseTerminalOptions) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const fitObserverRef = useRef<ResizeObserver | null>(null);
-  const activeResourceIdRef = useRef<string | null>(null);
-
-  const activeResourceId = useSessionStore((s) => s.activeResourceId);
+  const { activeWorkspaceId, activeResourceId } = useSessionStore();
+  const sendMessageRef = useRef(sendMessage);
+  sendMessageRef.current = sendMessage;
   const themeId = useThemeStore((s) => s.themeId);
   const fontId = useThemeStore((s) => s.fontId);
 
-  // 同步 ref
-  useEffect(() => {
-    activeResourceIdRef.current = activeResourceId;
-  }, [activeResourceId]);
+  const safeFit = useCallback((instance: TerminalInstance): boolean => {
+    const { clientWidth, clientHeight } = instance.container;
+    if (clientWidth <= 0 || clientHeight <= 0) return false;
+    try {
+      instance.fitAddon.fit();
+      return instance.terminal.cols > 0 && instance.terminal.rows > 0;
+    } catch {
+      return false;
+    }
+  }, []);
 
-  // ==================== 获取或创建终端实例 ====================
-  const getOrCreateTerminal = useCallback(
-    (resourceId: string): XTerminal => {
-      let term = terminalPool.get(resourceId);
-      if (term) return term;
+  const flushResize = useCallback((instance: TerminalInstance) => {
+    const { cols, rows } = instance.terminal;
+    if (cols <= 0 || rows <= 0) return;
+    if (cols === instance.lastCols && rows === instance.lastRows) return;
+    instance.lastCols = cols;
+    instance.lastRows = rows;
+    sendMessageRef.current({
+      type: 'resource:resize',
+      workspaceId: instance.workspaceId,
+      resourceId: instance.resourceId,
+      cols,
+      rows,
+    });
+  }, []);
 
-      const theme = getThemeColors();
-      term = new XTerminal({
-        fontFamily: getFontFamily(),
-        fontSize: getFontSize(),
-        lineHeight: 1.5,
-        cursorBlink: true,
-        cursorStyle: 'bar',
-        cursorInactiveStyle: 'outline',
-        scrollback: 8000,
-        allowProposedApi: true,
-        theme,
-      });
-
-      // WebGL 渲染
-      try {
-        term.loadAddon(new WebglAddon());
-      } catch {
-        // WebGL 不可用时回退到 canvas
+  const scheduleResize = useCallback(
+    (instance: TerminalInstance) => {
+      if (instance.resizeTimer !== null) {
+        window.clearTimeout(instance.resizeTimer);
       }
-      term.loadAddon(new WebLinksAddon());
+      instance.resizeTimer = window.setTimeout(() => {
+        instance.resizeTimer = null;
+        if (safeFit(instance)) {
+          flushResize(instance);
+        }
+      }, 150);
+    },
+    [safeFit, flushResize]
+  );
+
+  const subscribe = useCallback(
+    (instance: TerminalInstance): boolean => {
+      safeFit(instance);
+      const { cols, rows } = instance.terminal;
+      if (cols > 0 && rows > 0) {
+        instance.lastCols = cols;
+        instance.lastRows = rows;
+      }
+      const ok = sendMessageRef.current({
+        type: 'resource:subscribe',
+        workspaceId: instance.workspaceId,
+        resourceId: instance.resourceId,
+        cols: cols > 0 ? cols : undefined,
+        rows: rows > 0 ? rows : undefined,
+      });
+      if (ok !== false) {
+        instance.subscribedWsSession = currentWsSession;
+      }
+      return ok !== false;
+    },
+    [safeFit]
+  );
+
+  const subscribeWhenReady = useCallback(
+    (instance: TerminalInstance, attempt = 0) => {
+      safeFit(instance);
+      const { cols, rows } = instance.terminal;
+      if ((cols <= 0 || rows <= 0) && attempt < 40) {
+        requestAnimationFrame(() => subscribeWhenReady(instance, attempt + 1));
+        return;
+      }
+      if (!subscribe(instance) && attempt < 50) {
+        window.setTimeout(() => subscribeWhenReady(instance, attempt + 1), 100);
+      }
+    },
+    [safeFit, subscribe]
+  );
+
+  const ensureTerminal = useCallback(
+    (container: HTMLDivElement, resourceId: string, workspaceId: string): TerminalInstance => {
+      const existing = terminalPool.get(resourceId);
+      if (existing) {
+        if (existing.container !== container) {
+          container.appendChild(existing.wrapper);
+          existing.container = container;
+          existing.resizeObserver.disconnect();
+          existing.resizeObserver.observe(container);
+        }
+        existing.workspaceId = workspaceId;
+        return existing;
+      }
+
+      const terminal = new Terminal({
+        theme: getTheme(),
+        fontFamily: getFontFamily(),
+        fontSize: 14,
+        lineHeight: 1.0,
+        letterSpacing: 0,
+        cursorBlink: false,
+        cursorStyle: 'bar',
+        cursorWidth: 2,
+        scrollback: 5000,
+        allowTransparency: false,
+        disableStdin: true,
+        smoothScrollDuration: 0,
+      });
 
       const fitAddon = new FitAddon();
-      term.loadAddon(fitAddon);
-      fitAddonPool.set(resourceId, fitAddon);
+      terminal.loadAddon(fitAddon);
 
-      // 初始化输出缓冲
-      outputBuffer.set(resourceId, []);
+      try {
+        const webglAddon = new WebglAddon();
+        terminal.loadAddon(webglAddon);
+      } catch {
+        console.warn('WebGL not available, falling back to canvas renderer');
+      }
 
-      terminalPool.set(resourceId, term);
-      return term;
+      const wrapper = document.createElement('div');
+      wrapper.className = 'terminal-wrapper';
+      container.appendChild(wrapper);
+      terminal.open(wrapper);
+
+      const instance: TerminalInstance = {
+        terminal,
+        fitAddon,
+        container,
+        wrapper,
+        resizeObserver: null as unknown as ResizeObserver,
+        workspaceId,
+        resourceId,
+        lastCols: 0,
+        lastRows: 0,
+        resizeTimer: null,
+        subscribedWsSession: 0,
+        writeBuffer: '',
+        writeRafId: 0,
+      };
+
+      const resizeObserver = new ResizeObserver(() => scheduleResize(instance));
+      resizeObserver.observe(container);
+      instance.resizeObserver = resizeObserver;
+
+      terminalPool.set(resourceId, instance);
+      requestAnimationFrame(() => safeFit(instance));
+
+      return instance;
     },
-    []
+    [safeFit, scheduleResize]
   );
 
-  // ==================== 切换终端实例 ====================
   const switchTerminal = useCallback(
     (container: HTMLDivElement) => {
-      const resourceId = activeResourceIdRef.current;
-      if (!resourceId) return;
+      if (!activeResourceId || !activeWorkspaceId) return;
 
-      // 断开旧终端
-      if (containerRef.current && activeTerminalId) {
-        const oldTerm = terminalPool.get(activeTerminalId);
-        if (oldTerm) {
-          try {
-            oldTerm.element?.remove();
-          } catch {}
-        }
-      }
-
-      containerRef.current = container;
-      activeTerminalId = resourceId;
-
-      // 获取或创建
-      const term = getOrCreateTerminal(resourceId);
-
-      // 挂载到 DOM
-      if (!term.element) {
-        term.open(container);
-      } else {
-        container.appendChild(term.element);
-      }
-
-      // fit
-      const fitAddon = fitAddonPool.get(resourceId);
-      if (fitAddon) {
-        requestAnimationFrame(() => {
-          try {
-            fitAddon.fit();
-          } catch {}
-        });
-      }
-
-      // 聚焦
-      term.focus();
-
-      // 订阅用户输入 → WebSocket
-      term.onData((data) => {
-        const rid = activeResourceIdRef.current;
-        if (!rid) return;
-        const wsId = useSessionStore.getState().activeWorkspaceId;
-        if (!wsId) return;
-        sendMessage({
-          type: 'resource:input',
-          workspaceId: wsId,
-          resourceId: rid,
-          data,
-        });
+      terminalPool.forEach((instance, id) => {
+        instance.wrapper.style.display = id === activeResourceId ? 'block' : 'none';
       });
 
-      // ResizeObserver
-      if (fitObserverRef.current) {
-        fitObserverRef.current.disconnect();
-      }
-      fitObserverRef.current = new ResizeObserver(() => {
-        const fa = fitAddonPool.get(resourceId);
-        if (fa && term.element) {
-          try {
-            fa.fit();
-          } catch {}
-        }
-      });
-      fitObserverRef.current.observe(container);
+      const instance = ensureTerminal(container, activeResourceId, activeWorkspaceId);
+      instance.wrapper.style.display = 'block';
 
-      // 恢复已有输出
-      const lines = outputBuffer.get(resourceId);
-      if (lines && lines.length > 0 && term.buffer.active.length <= 1) {
-        term.write(lines.join('\r\n'));
-      }
+      requestAnimationFrame(() => {
+        safeFit(instance);
+
+        if (instance.subscribedWsSession !== currentWsSession) {
+          subscribeWhenReady(instance);
+        } else {
+          flushResize(instance);
+        }
+
+        try {
+          instance.terminal.focus();
+        } catch {}
+      });
     },
-    [sendMessage, getOrCreateTerminal]
+    [activeResourceId, activeWorkspaceId, ensureTerminal, safeFit, subscribeWhenReady, flushResize]
   );
 
-  // ==================== 终端主题/字体热更新 ====================
-  useEffect(() => {
-    const theme = getThemeColors();
-    const fontFamily = getFontFamily();
-    const fontSize = getFontSize();
+  // 写入批处理：收集一帧内的所有数据，统一写入，减少重绘次数
+  const writeToTerminal = useCallback((resourceId: string, data: string) => {
+    const instance = terminalPool.get(resourceId);
+    if (!instance) return;
 
-    terminalPool.forEach((term) => {
-      term.options.theme = theme;
-      term.options.fontFamily = fontFamily;
-      term.options.fontSize = fontSize;
+    instance.writeBuffer += data;
+
+    if (instance.writeRafId === 0) {
+      instance.writeRafId = requestAnimationFrame(() => {
+        instance.writeRafId = 0;
+        const buf = instance.writeBuffer;
+        instance.writeBuffer = '';
+        if (!buf) return;
+
+        // 智能滚动：写入前检测用户是否在底部附近
+        const viewport = instance.terminal.element?.querySelector('.xterm-viewport');
+        const wasNearBottom = viewport
+          ? viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80
+          : true;
+
+        instance.terminal.write(buf, () => {
+          if (wasNearBottom) {
+            instance.terminal.scrollToBottom();
+          }
+        });
+      });
+    }
+  }, []);
+
+  const restoreSnapshot = useCallback((resourceId: string, snapshot: TerminalSnapshot) => {
+    const instance = terminalPool.get(resourceId);
+    if (!instance) return;
+    if (instance.writeRafId !== 0) {
+      cancelAnimationFrame(instance.writeRafId);
+      instance.writeRafId = 0;
+      instance.writeBuffer = '';
+    }
+    instance.terminal.reset();
+    instance.terminal.write(snapshot.ansiBuffer.join(''), () => {
+      instance.terminal.scrollToBottom();
+    });
+  }, []);
+
+  const disposeTerminal = useCallback((resourceId: string) => {
+    const instance = terminalPool.get(resourceId);
+    if (instance) {
+      if (instance.resizeTimer !== null) {
+        window.clearTimeout(instance.resizeTimer);
+      }
+      if (instance.writeRafId !== 0) {
+        cancelAnimationFrame(instance.writeRafId);
+      }
+      instance.resizeObserver.disconnect();
+      instance.terminal.dispose();
+      instance.wrapper.remove();
+      terminalPool.delete(resourceId);
+    }
+  }, []);
+
+  const fitTerminal = useCallback(() => {
+    if (!activeResourceId) return;
+    const instance = terminalPool.get(activeResourceId);
+    if (instance) {
+      requestAnimationFrame(() => {
+        if (safeFit(instance)) {
+          flushResize(instance);
+        }
+      });
+    }
+  }, [activeResourceId, safeFit, flushResize]);
+
+  // ==================== 主题/字体热更新 ====================
+  useEffect(() => {
+    const theme = getTheme();
+    const fontFamily = getFontFamily();
+    terminalPool.forEach((instance) => {
+      instance.terminal.options.theme = theme;
+      instance.terminal.options.fontFamily = fontFamily;
     });
   }, [themeId, fontId]);
 
-  // ==================== PTY 输出 → 终端 ====================
   useEffect(() => {
-    const handler = (e: Event) => {
-      const { resourceId, data } = (e as CustomEvent).detail;
-      if (!resourceId || !data) return;
+    currentWsSession = wsSessionId;
 
-      // 追加到缓冲
-      const lines = outputBuffer.get(resourceId) || [];
-      // 拆分新行，保留每行
-      const newLines = data.split('\n');
-      if (lines.length > 0) {
-        // 最后一行可能需要拼接（\r 不换行）
-        lines[lines.length - 1] += newLines[0];
-        for (let i = 1; i < newLines.length; i++) {
-          lines.push(newLines[i]);
+    const handleWsConnected = (event: Event) => {
+      currentWsSession = (event as CustomEvent<number>).detail;
+      resetAllTerminalSubscriptions();
+
+      if (activeResourceId && activeWorkspaceId) {
+        const instance = terminalPool.get(activeResourceId);
+        if (instance) {
+          subscribeWhenReady(instance);
         }
-      } else {
-        lines.push(...newLines);
       }
-      outputBuffer.set(resourceId, lines);
-
-      // 限流写入
-      const term = terminalPool.get(resourceId);
-      if (!term) return;
-
-      if (pendingWrites.has(resourceId)) return;
-
-      const handle = requestAnimationFrame(() => {
-        pendingWrites.delete(resourceId);
-        term.write(data);
-      });
-      pendingWrites.set(resourceId, handle);
     };
 
-    window.addEventListener('pty:output', handler);
-    return () => window.removeEventListener('pty:output', handler);
-  }, []);
+    window.addEventListener('ws:connected', handleWsConnected);
+    return () => window.removeEventListener('ws:connected', handleWsConnected);
+  }, [activeResourceId, activeWorkspaceId, subscribeWhenReady]);
 
-  // ==================== 终端事件（exit） ====================
   useEffect(() => {
-    const handler = (e: Event) => {
-      const { resourceId } = (e as CustomEvent).detail;
-      if (!resourceId) return;
-      const term = terminalPool.get(resourceId);
-      if (term) {
-        term.write('\r\n\x1b[90m── Process exited ──\x1b[0m\r\n');
+    const handleResourceEvent = (event: Event) => {
+      const message = (event as CustomEvent<ServerMessage>).detail;
+
+      switch (message.type) {
+        case 'resource:output':
+          writeToTerminal(message.resourceId, message.data);
+          break;
+
+        case 'resource:snapshot':
+          restoreSnapshot(message.resourceId, message.snapshot);
+          break;
+
+        case 'resource:status':
+          if (message.status === 'EXITED' || message.status === 'STOPPED') {
+            writeToTerminal(
+              message.resourceId,
+              '\r\n\x1b[33m[Process exited]\x1b[0m\r\n'
+            );
+          }
+          break;
+
+        case 'resource:deleted':
+          disposeTerminal(message.resourceId);
+          break;
       }
     };
 
-    window.addEventListener('pty:exit', handler);
-    return () => window.removeEventListener('pty:exit', handler);
-  }, []);
-
-  // ==================== Cleanup ====================
-  useEffect(() => {
-    return () => {
-      if (fitObserverRef.current) {
-        fitObserverRef.current.disconnect();
-      }
-    };
-  }, []);
+    window.addEventListener('ws:resource', handleResourceEvent);
+    return () => window.removeEventListener('ws:resource', handleResourceEvent);
+  }, [writeToTerminal, restoreSnapshot, disposeTerminal]);
 
   return {
     switchTerminal,
-    terminalPool,
+    writeToTerminal,
+    disposeTerminal,
+    fitTerminal,
   };
 }
