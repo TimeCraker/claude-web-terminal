@@ -300,12 +300,12 @@ const cyberGeek: ThemeDefinition = {
 };
 
 // ============================================================
-// Theme 5: Linear Dark（薰衣草深空）
+// Theme 5: Linear Dark（宇宙深空）
 // ============================================================
 const linearDark: ThemeDefinition = {
   id: 'linear-dark',
   name: 'Linear Dark',
-  nameZh: '薰衣草深空',
+  nameZh: '宇宙深空',
   description: 'Near-black luxury with lavender-blue accent. Quietly premium.',
   icon: '🔮',
   isDark: true,

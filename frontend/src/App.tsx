@@ -4,6 +4,7 @@ import { Terminal } from './components/Terminal';
 import { StatusBar } from './components/StatusBar';
 import { SettingsPanel } from './components/SettingsPanel';
 import { TopBar } from './components/TopBar';
+import { ThemeOnboarding } from './components/ThemeOnboarding';
 import { Icon } from './components/Icon';
 import { BrandLogo } from './components/BrandLogo';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -207,6 +208,9 @@ const App: React.FC = () => {
 
       {/* Settings Panel (右侧边栏) */}
       <SettingsPanel isOpen={isSettingsOpen} onClose={closeSettings} />
+
+      {/* 首次访问主题引导 */}
+      <ThemeOnboarding />
     </div>
   );
 };
