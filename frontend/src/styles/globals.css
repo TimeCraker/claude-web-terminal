@@ -64,6 +64,33 @@ body,
   overflow: hidden;
 }
 
+/* 彻底隐藏 xterm 辅助输入层 —— 防止白块/乱码穿帮 */
+.xterm-helper-textarea {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  top: -9999px !important;
+  left: -9999px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  resize: none !important;
+  outline: none !important;
+  background: transparent !important;
+  color: transparent !important;
+  caret-color: transparent !important;
+  -webkit-appearance: none !important;
+}
+
+/* 清除 xterm 渲染层顶部多余空间 */
+.xterm .xterm-screen {
+  top: 0 !important;
+}
+
 /* 选择文本样式 */
 .xterm .xterm-selection {
   opacity: 1;

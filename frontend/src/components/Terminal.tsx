@@ -89,12 +89,12 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
   );
 
   return (
-    <div className="flex-1 flex flex-col bg-[#1C1D22] min-h-0 overflow-hidden">
-      {/* Terminal 渲染区域 - 高度死锁 */}
-      <div className="flex-1 p-3 pb-0 min-h-0 overflow-hidden">
+    <div className="flex-1 flex flex-col bg-[#1C1D22] min-h-0 overflow-hidden h-full">
+      {/* Terminal 渲染区域 - 双层沙盒隔离 */}
+      <div className="flex-1 p-3 pb-0 min-h-0 overflow-hidden relative">
         <div
           ref={containerRef}
-          className="w-full h-full rounded-2xl overflow-hidden relative"
+          className="absolute inset-0 w-full h-full rounded-2xl overflow-hidden select-none"
           style={{
             background: '#1C1D22',
             boxShadow:

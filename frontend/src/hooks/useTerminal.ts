@@ -149,11 +149,19 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
 
       terminalPool.set(resourceId, instance);
 
-      // 请求订阅
-      sendMessageRef.current({
-        type: 'resource:subscribe',
-        workspaceId,
-        resourceId,
+      // 请求订阅 —— 带上当前终端尺寸，让后端先 resize PTY 再重放快照
+      requestAnimationFrame(() => {
+        try {
+          fitAddon.fit();
+        } catch {}
+        const { cols, rows } = terminal;
+        sendMessageRef.current({
+          type: 'resource:subscribe',
+          workspaceId,
+          resourceId,
+          cols: cols > 0 ? cols : undefined,
+          rows: rows > 0 ? rows : undefined,
+        });
       });
 
       return instance;
@@ -195,12 +203,12 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
     }
   }, []);
 
-  // 恢复快照
+  // 恢复快照 —— 直接拼接原始 chunk，不插入额外的 \r\n（原始数据已包含换行符）
   const restoreSnapshot = useCallback((resourceId: string, snapshot: TerminalSnapshot) => {
     const instance = terminalPool.get(resourceId);
     if (instance) {
       instance.terminal.clear();
-      instance.terminal.write(snapshot.ansiBuffer.join('\r\n'));
+      instance.terminal.write(snapshot.ansiBuffer.join(''));
     }
   }, []);
 

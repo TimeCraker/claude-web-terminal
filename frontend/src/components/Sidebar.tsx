@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
 import { useSessionStore } from '../store/sessionStore';
-import { ResourceType } from '../types';
+import { ResourceType, ClientMessage } from '../types';
+import { Icon } from './Icon';
+import { BrandLogo } from './BrandLogo';
 
 interface SidebarProps {
+  sendMessage: (message: ClientMessage) => void;
   onCreateWorkspace: (name: string, path: string) => void;
   onCreateResource: (workspaceId: string, type: ResourceType) => void;
   onDeleteWorkspace: (workspaceId: string) => void;
@@ -10,6 +13,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
+  sendMessage,
   onCreateWorkspace,
   onCreateResource,
   onDeleteWorkspace,
@@ -51,20 +55,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  const getResourceIcon = (type: ResourceType) => {
+  const getResourceIconName = (type: ResourceType): string => {
     switch (type) {
       case 'claude':
-        return '🤖';
+        return 'sparkles';
       case 'shell':
-        return '💻';
+        return 'terminal';
       case 'git':
-        return '📦';
+        return 'git';
       case 'logs':
-        return '📋';
+        return 'file';
       case 'browser':
-        return '🌐';
+        return 'globe';
       default:
-        return '⚙️';
+        return 'settings';
     }
   };
 
@@ -90,25 +94,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setActiveWorkspace(workspace.id);
                 setIsCollapsed(false);
               }}
-              className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 ${
+              className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 ${
                 activeWorkspaceId === workspace.id
-                  ? 'bg-gradient-to-r from-[#53D8FB]/15 to-[#9D4EDD]/15 border border-[#53D8FB]/20'
-                  : 'hover:bg-[#25262C]'
+                  ? 'bg-gradient-to-r from-[#53D8FB]/15 to-[#9D4EDD]/15 border border-[#53D8FB]/20 text-white'
+                  : 'hover:bg-[#25262C] text-neutral-400'
               }`}
               title={workspace.name}
             >
-              {workspace.icon}
+              <Icon name={workspace.icon} size={18} />
             </button>
           ))}
         </div>
 
+        {/* 一键创建默认工作空间 */}
+        <button
+          onClick={() => sendMessage({ type: 'workspace:quick_create' })}
+          className="w-10 h-10 rounded-xl bg-gradient-to-r from-[#53D8FB] to-[#9D4EDD] flex items-center justify-center text-white hover:scale-105 hover:shadow-[0_0_15px_rgba(83,216,251,0.3)] transition-all duration-200 mt-4"
+          title="Quick Create Workspace"
+        >
+          <Icon name="zap" size={18} />
+        </button>
+
+        {/* 手动创建工作空间 */}
         <button
           onClick={() => {
             setIsCreating(true);
             setIsCollapsed(false);
           }}
-          className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#1C1D22] text-lg font-bold hover:scale-105 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all duration-200 mt-4"
-          title="New Workspace"
+          className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-[#1C1D22] hover:scale-105 hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all duration-200"
+          title="New Workspace (Custom)"
         >
           +
         </button>
@@ -121,22 +135,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="w-72 bg-[#16171B] border-r border-neutral-800/60 flex flex-col h-full transition-all duration-300">
       {/* Header */}
       <div className="p-4 border-b border-neutral-800/60 flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-bold text-white" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3)' }}>
-            AI Workspace
-          </h1>
-          <p className="text-[11px] text-neutral-500 mt-0.5 font-medium tracking-wider uppercase">
-            Terminal Manager
-          </p>
-        </div>
+        <BrandLogo size={32} showText />
         <button
           onClick={() => setIsCollapsed(true)}
           className="w-8 h-8 rounded-lg bg-[#25262C] hover:bg-[#2D2E36] flex items-center justify-center text-neutral-500 hover:text-neutral-400 transition-all duration-200"
           title="Collapse sidebar"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
-          </svg>
+          <Icon name="chevron-left" size={16} />
         </button>
       </div>
 
@@ -157,7 +162,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => setActiveWorkspace(workspace.id)}
                   className="flex items-center gap-3 flex-1 min-w-0"
                 >
-                  <span className="text-xl">{workspace.icon}</span>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    activeWorkspaceId === workspace.id
+                      ? 'bg-gradient-to-r from-[#53D8FB]/20 to-[#9D4EDD]/20 text-white'
+                      : 'bg-[#25262C] text-neutral-400'
+                  }`}>
+                    <Icon name={workspace.icon} size={16} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-semibold text-neutral-200 truncate">
                       {workspace.name}
@@ -182,9 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-red-400 hover:bg-red-400/10 transition-all duration-200"
                   title="Delete workspace"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
+                  <Icon name="trash" size={14} />
                 </button>
               </div>
             </div>
@@ -205,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       onClick={() => setActiveResource(resource.id)}
                       className="flex-1 flex items-center gap-2.5 min-w-0"
                     >
-                      <span className="text-sm">{getResourceIcon(resource.type)}</span>
+                      <Icon name={getResourceIconName(resource.type)} size={14} />
                       <span className="flex-1 truncate font-medium text-left">{resource.name}</span>
                       <div
                         className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusColor(
@@ -221,23 +230,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       className="opacity-0 group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center text-neutral-500 hover:text-red-400 hover:bg-red-400/10 transition-all duration-200"
                       title="Close terminal"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
+                      <Icon name="x" size={14} />
                     </button>
                   </div>
                 ))}
 
                 {/* Add Resource Buttons */}
-                <div className="flex gap-1.5 mt-2 pt-2 border-t border-neutral-800/40">
-                  {(['claude', 'shell', 'git'] as ResourceType[]).map((type) => (
+                <div className="space-y-1 mt-2 pt-2 border-t border-neutral-800/40">
+                  {([
+                    { type: 'claude' as ResourceType, label: 'Claude' },
+                    { type: 'shell' as ResourceType, label: 'Shell' },
+                    { type: 'git' as ResourceType, label: 'Git' },
+                  ]).map(({ type, label }) => (
                     <button
                       key={type}
                       onClick={() => onCreateResource(workspace.id, type)}
-                      className="flex-1 text-xs px-2 py-1.5 rounded-lg bg-[#25262C] hover:bg-[#2D2E36] text-neutral-400 hover:text-neutral-300 transition-all duration-200 border border-neutral-800/40 hover:border-neutral-700/50"
+                      className="w-full flex items-center gap-2 px-2 py-1.5 bg-neutral-800/30 hover:bg-neutral-800/60 rounded-md transition-all group/btn"
                       title={`New ${type}`}
                     >
-                      + {getResourceIcon(type)}
+                      <Icon name="plus" size={12} className="text-neutral-500 group-hover/btn:text-neutral-300" />
+                      <Icon name={getResourceIconName(type)} size={12} className="text-neutral-500 group-hover/btn:text-neutral-300" />
+                      <span className="text-xs text-neutral-400 group-hover/btn:text-neutral-200 ml-0.5">{label}</span>
                     </button>
                   ))}
                 </div>
@@ -248,7 +261,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       {/* Create Workspace */}
-      <div className="p-4 border-t border-neutral-800/60">
+      <div className="p-4 border-t border-neutral-800/60 space-y-2">
+        {/* 一键创建 + 手动创建 并排 */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => sendMessage({ type: 'workspace:quick_create' })}
+            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#53D8FB] to-[#9D4EDD] text-white rounded-xl text-sm font-semibold hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(83,216,251,0.3)] transition-all duration-300 flex items-center justify-center gap-2"
+            title="Quick Create Workspace"
+          >
+            <Icon name="zap" size={14} />
+            <span>Quick</span>
+          </button>
+          <button
+            onClick={() => setIsCreating(true)}
+            className="flex-1 px-4 py-2.5 bg-white text-[#1C1D22] rounded-xl text-sm font-semibold hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all duration-300 flex items-center justify-center gap-2"
+          >
+            <Icon name="plus" size={14} />
+            <span>Custom</span>
+          </button>
+        </div>
+
         {isCreating ? (
           <div className="space-y-3">
             <input
@@ -280,15 +312,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </button>
             </div>
           </div>
-        ) : (
-          <button
-            onClick={() => setIsCreating(true)}
-            className="w-full px-4 py-3 bg-white text-[#1C1D22] rounded-xl text-sm font-semibold hover:scale-[1.02] hover:shadow-[0_0_15px_rgba(255,255,255,0.2)] transition-all duration-300 flex items-center justify-center gap-2"
-          >
-            <span className="text-lg">+</span>
-            <span>New Workspace</span>
-          </button>
-        )}
+        ) : null}
       </div>
     </div>
   );

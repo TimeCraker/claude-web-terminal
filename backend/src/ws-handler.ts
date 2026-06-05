@@ -68,6 +68,10 @@ export class WebSocketHandler {
         this.handleWorkspaceCreate(ws, message.name, message.path, message.icon, message.color);
         break;
 
+      case 'workspace:quick_create':
+        this.handleWorkspaceQuickCreate(ws);
+        break;
+
       case 'workspace:delete':
         this.handleWorkspaceDelete(ws, message.workspaceId);
         break;
@@ -81,7 +85,7 @@ export class WebSocketHandler {
         break;
 
       case 'resource:subscribe':
-        this.handleResourceSubscribe(ws, message.workspaceId, message.resourceId);
+        this.handleResourceSubscribe(ws, message.workspaceId, message.resourceId, message.cols, message.rows);
         break;
 
       case 'resource:input':
@@ -119,6 +123,15 @@ export class WebSocketHandler {
   ): void {
     const workspace = this.sessionManager.createWorkspace(name, path, icon, color);
     this.broadcast({ type: 'workspace:created', workspace });
+  }
+
+  private handleWorkspaceQuickCreate(ws: WebSocket): void {
+    const workspace = this.sessionManager.quickCreateWorkspace();
+    if (workspace) {
+      this.broadcast({ type: 'workspace:created', workspace });
+    } else {
+      this.sendError(ws, 'Failed to create workspace directory');
+    }
   }
 
   private handleWorkspaceDelete(ws: WebSocket, workspaceId: string): void {
@@ -169,7 +182,7 @@ export class WebSocketHandler {
     }
   }
 
-  private handleResourceSubscribe(ws: WebSocket, workspaceId: string, resourceId: string): void {
+  private handleResourceSubscribe(ws: WebSocket, workspaceId: string, resourceId: string, cols?: number, rows?: number): void {
     const clientInfo = this.clients.get(ws);
     if (clientInfo) {
       // 取消订阅旧的 resource
@@ -179,6 +192,12 @@ export class WebSocketHandler {
 
       clientInfo.workspaceId = workspaceId;
       clientInfo.resourceId = resourceId;
+    }
+
+    // 关键：先 resize PTY 到前端实际尺寸，再重放快照
+    // 这样 ANSI 光标定位码（如 \x1b[1;1H）才能和前端的行列网格对齐
+    if (cols && rows && cols > 0 && rows > 0) {
+      this.sessionManager.resizeResource(resourceId, cols, rows);
     }
 
     // 订阅新的 resource 输出
@@ -191,7 +210,7 @@ export class WebSocketHandler {
       });
     });
 
-    // 发送 Buffer Cache（快照恢复）
+    // 发送 Buffer Cache（快照恢复）—— 此时 PTY 已经是正确的尺寸
     const snapshot = this.sessionManager.getResourceSnapshot(resourceId);
     if (snapshot && snapshot.ansiBuffer.length > 0) {
       this.send(ws, {

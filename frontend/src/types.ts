@@ -41,9 +41,10 @@ export interface Workspace {
 // WebSocket 协议 (与后端保持一致)
 export type ClientMessage =
   | { type: 'workspace:create'; name: string; path: string; icon?: string; color?: string }
+  | { type: 'workspace:quick_create' }
   | { type: 'workspace:delete'; workspaceId: string }
   | { type: 'resource:create'; workspaceId: string; resourceType: ResourceType; name?: string }
-  | { type: 'resource:subscribe'; workspaceId: string; resourceId: string }
+  | { type: 'resource:subscribe'; workspaceId: string; resourceId: string; cols?: number; rows?: number }
   | { type: 'resource:input'; workspaceId: string; resourceId: string; data: string }
   | { type: 'resource:resize'; workspaceId: string; resourceId: string; cols: number; rows: number }
   | { type: 'resource:kill'; workspaceId: string; resourceId: string }

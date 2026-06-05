@@ -1,5 +1,7 @@
 import { spawn, IPty } from 'node-pty';
 import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 import {
   Workspace,
   WorkspaceResource,
@@ -13,6 +15,7 @@ import {
 const DEFAULT_CLAUDE_COMMAND = 'claude';
 const DEFAULT_SHELL = process.platform === 'win32' ? 'powershell.exe' : 'bash';
 const MAX_BUFFER_LINES = 5000;
+const BASE_PROJECT_DIR = '/home/ubuntu/project';
 
 export class SessionManager {
   private workspaces: Map<string, Workspace> = new Map();
@@ -28,7 +31,7 @@ export class SessionManager {
   createWorkspace(
     name: string,
     path: string,
-    icon: string = '📁',
+    icon: string = 'folder',
     color: string = '#53D8FB'
   ): Workspace {
     const id = uuidv4();
@@ -53,6 +56,45 @@ export class SessionManager {
     return workspace;
   }
 
+  /**
+   * 快速创建默认工作空间（自动递增命名 + 自动建目录）
+   */
+  quickCreateWorkspace(): Workspace | null {
+    // 确保基础目录存在
+    if (!fs.existsSync(BASE_PROJECT_DIR)) {
+      fs.mkdirSync(BASE_PROJECT_DIR, { recursive: true });
+    }
+
+    // 找到下一个可用编号
+    let maxNum = 0;
+    for (const ws of this.workspaces.values()) {
+      const match = ws.name.match(/^workspace(\d+)$/);
+      if (match) {
+        maxNum = Math.max(maxNum, parseInt(match[1], 10));
+      }
+    }
+
+    const nextNum = maxNum + 1;
+    const name = `workspace${nextNum}`;
+    const wsPath = path.join(BASE_PROJECT_DIR, name);
+
+    // 创建服务器目录
+    try {
+      fs.mkdirSync(wsPath, { recursive: true });
+      console.log(`📂 Directory created: ${wsPath}`);
+    } catch (e) {
+      console.error(`❌ Failed to create directory: ${wsPath}`, e);
+      return null;
+    }
+
+    const icons = ['terminal', 'zap', 'wrench', 'code', 'target', 'box', 'layers', 'sparkles'];
+    const colors = ['#53D8FB', '#9D4EDD', '#A8E6CF', '#FFD3B6', '#FF6B6B', '#4EA8DE'];
+    const icon = icons[(nextNum - 1) % icons.length];
+    const color = colors[(nextNum - 1) % colors.length];
+
+    return this.createWorkspace(name, wsPath, icon, color);
+  }
+
   deleteWorkspace(workspaceId: string): boolean {
     const workspace = this.workspaces.get(workspaceId);
     if (!workspace) return false;
@@ -69,6 +111,16 @@ export class SessionManager {
         this.ptyProcesses.delete(resource.id);
       }
       this.outputListeners.delete(resource.id);
+    }
+
+    // 删除服务器目录（仅限 project 目录下的工作空间）
+    if (workspace.path.startsWith(BASE_PROJECT_DIR)) {
+      try {
+        fs.rmSync(workspace.path, { recursive: true, force: true });
+        console.log(`📂 Directory deleted: ${workspace.path}`);
+      } catch (e) {
+        console.warn(`⚠️ Failed to delete directory: ${workspace.path}`, e);
+      }
     }
 
     this.workspaces.delete(workspaceId);
@@ -208,11 +260,11 @@ export class SessionManager {
     for (const workspace of this.workspaces.values()) {
       const resource = workspace.resources.find(r => r.id === resourceId);
       if (resource) {
-        // 更新 Buffer Cache
-        const lines = data.split('\n');
-        resource.snapshot.ansiBuffer.push(...lines);
+        // 更新 Buffer Cache —— 保持原始 chunk 完整，不按 \n 切割
+        // 这样 ANSI 逃逸码（如 \x1b[2J）不会被截断
+        resource.snapshot.ansiBuffer.push(data);
 
-        // 保留最近 MAX_BUFFER_LINES 行
+        // 按 chunk 数量裁剪（而非按行数），保持每个 chunk 的完整性
         if (resource.snapshot.ansiBuffer.length > MAX_BUFFER_LINES) {
           resource.snapshot.ansiBuffer = resource.snapshot.ansiBuffer.slice(-MAX_BUFFER_LINES);
         }
