@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useSessionStore } from '../store/sessionStore';
 import { ResourceType, ClientMessage } from '../types';
 import { Icon } from './Icon';
@@ -37,6 +37,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPath, setNewPath] = useState('');
+  const [isQuickCreating, setIsQuickCreating] = useState(false);
+  const [quickCreateCooldown, setQuickCreateCooldown] = useState(0);
+  const [closingResources, setClosingResources] = useState<Set<string>>(new Set());
+
+  // 冷却计时器
+  React.useEffect(() => {
+    if (quickCreateCooldown > 0) {
+      const timer = setTimeout(() => setQuickCreateCooldown(quickCreateCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [quickCreateCooldown]);
+
+  // 监听工作区创建完成
+  const prevWorkspaceCountRef = useRef(workspaces.length);
+  React.useEffect(() => {
+    if (isQuickCreating && workspaces.length > prevWorkspaceCountRef.current) {
+      const timer = setTimeout(() => {
+        setIsQuickCreating(false);
+        setQuickCreateCooldown(5);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+    prevWorkspaceCountRef.current = workspaces.length;
+  }, [workspaces, isQuickCreating]);
 
   const handleCreate = () => {
     if (newName && newPath) {
@@ -56,6 +80,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
     onCreateResource(workspaceId, type);
     onClose();
   };
+
+  const handleQuickCreate = useCallback(() => {
+    if (quickCreateCooldown > 0 || isQuickCreating) return;
+    sendMessage({ type: 'workspace:quick_create' });
+    setIsQuickCreating(true);
+  }, [quickCreateCooldown, isQuickCreating, sendMessage]);
+
+  const handleDeleteResource = useCallback((workspaceId: string, resourceId: string) => {
+    if (closingResources.has(resourceId)) return;
+
+    setClosingResources(prev => new Set(prev).add(resourceId));
+
+    // 发送删除消息
+    onDeleteResource(workspaceId, resourceId);
+
+    // 延迟清除状态
+    setTimeout(() => {
+      setClosingResources(prev => {
+        const next = new Set(prev);
+        next.delete(resourceId);
+        return next;
+      });
+    }, 2000);
+  }, [closingResources, onDeleteResource]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -184,41 +232,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Resources */}
               {activeWorkspaceId === workspace.id && (
                 <div className="ml-4 mt-2 space-y-1">
-                  {workspace.resources.map((resource) => (
-                    <div
-                      key={resource.id}
-                      className={`group flex items-center gap-1 px-3 py-2 rounded-lg text-sm transition-all duration-200 hover-glow ${
-                        activeResourceId === resource.id
-                          ? 'glow-active bg-theme-surface-light text-theme-text border border-theme-border-strong'
-                          : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border'
-                      }`}
-                    >
-                      <button
-                        onClick={() => handleSelectResource(resource.id)}
-                        className="flex-1 flex items-center gap-2.5 min-w-0"
+                  {workspace.resources.map((resource) => {
+                    const isClosing = closingResources.has(resource.id);
+                    return (
+                      <div
+                        key={resource.id}
+                        className={`group flex items-center gap-1 px-3 py-2 rounded-lg text-sm transition-all duration-200 hover-glow ${
+                          isClosing
+                            ? 'opacity-50 pointer-events-none'
+                            : activeResourceId === resource.id
+                              ? 'glow-active bg-theme-surface-light text-theme-text border border-theme-border-strong'
+                              : 'text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border'
+                        }`}
                       >
-                        <Icon name={getResourceIconName(resource.type)} size={14} />
-                        <span className="flex-1 truncate font-medium text-left">
-                          {resource.name}
-                        </span>
-                        <div
-                          className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusColor(
-                            resource.status
-                          )}`}
-                        />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteResource(workspace.id, resource.id);
-                        }}
-                        className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 w-6 h-6 rounded-md flex items-center justify-center text-theme-text-muted hover:text-theme-error hover:bg-theme-error/10 transition-all duration-200 flex-shrink-0"
-                        title="Close terminal"
-                      >
-                        <Icon name="x" size={14} />
-                      </button>
-                    </div>
-                  ))}
+                        <button
+                          onClick={() => handleSelectResource(resource.id)}
+                          className="flex-1 flex items-center gap-2.5 min-w-0"
+                          disabled={isClosing}
+                        >
+                          <Icon name={getResourceIconName(resource.type)} size={14} />
+                          <span className="flex-1 truncate font-medium text-left">
+                            {resource.name}
+                          </span>
+                          <div
+                            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${getStatusColor(
+                              resource.status
+                            )}`}
+                          />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteResource(workspace.id, resource.id);
+                          }}
+                          disabled={isClosing}
+                          className={`w-6 h-6 rounded-md flex items-center justify-center transition-all duration-200 flex-shrink-0 ${
+                            isClosing
+                              ? 'text-theme-text-muted cursor-not-allowed'
+                              : 'opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-theme-text-muted hover:text-theme-error hover:bg-theme-error/10'
+                          }`}
+                          title={isClosing ? 'Closing...' : 'Close terminal'}
+                        >
+                          {isClosing ? (
+                            <div className="w-3 h-3 border-2 border-theme-text-muted border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <Icon name="x" size={14} />
+                          )}
+                        </button>
+                      </div>
+                    );
+                  })}
 
                   {/* Add Resource Buttons */}
                   <div className="space-y-1 mt-2 pt-2 border-t border-theme-border">
@@ -261,13 +324,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="p-4 border-t border-theme-border space-y-2 flex-shrink-0">
           <div className="flex gap-2">
             <button
-              onClick={() => sendMessage({ type: 'workspace:quick_create' })}
-              className="flex-1 px-4 py-2.5 text-theme-bg rounded-xl text-sm font-semibold hover:scale-[1.02] hover-glow transition-all duration-300 flex items-center justify-center gap-2"
-              style={{ background: 'linear-gradient(to right, var(--theme-gradient-from), var(--theme-gradient-to))' }}
+              onClick={handleQuickCreate}
+              disabled={quickCreateCooldown > 0 || isQuickCreating}
+              className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
+                quickCreateCooldown > 0 || isQuickCreating
+                  ? 'bg-theme-surface-light/50 text-theme-text-muted cursor-not-allowed'
+                  : 'text-theme-bg hover:scale-[1.02] hover-glow'
+              }`}
+              style={quickCreateCooldown > 0 || isQuickCreating ? {} : { background: 'linear-gradient(to right, var(--theme-gradient-from), var(--theme-gradient-to))' }}
               title="Quick Create Workspace"
             >
-              <Icon name="zap" size={14} />
-              <span>Quick</span>
+              {isQuickCreating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-theme-text-muted border-t-transparent rounded-full animate-spin" />
+                  <span>生成中...</span>
+                </>
+              ) : quickCreateCooldown > 0 ? (
+                <>
+                  <Icon name="zap" size={14} />
+                  <span>等待 {quickCreateCooldown}s</span>
+                </>
+              ) : (
+                <>
+                  <Icon name="zap" size={14} />
+                  <span>Quick</span>
+                </>
+              )}
             </button>
             <button
               onClick={() => setIsCreating((v) => !v)}
@@ -277,6 +359,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span>Custom</span>
             </button>
           </div>
+
+          {/* 生成中提示 */}
+          {isQuickCreating && (
+            <div className="flex items-center justify-center gap-2 text-xs text-theme-text-secondary py-1">
+              <div className="w-1.5 h-1.5 bg-theme-accent rounded-full animate-pulse" />
+              <span>AI 智能体工作区正在生成中...</span>
+            </div>
+          )}
 
           {/* Settings Button */}
           <button
