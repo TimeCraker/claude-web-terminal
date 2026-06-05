@@ -73,12 +73,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleSelectResource = (resourceId: string) => {
     setActiveResource(resourceId);
-    onClose();
+    // 不自动关闭侧边栏，让用户自己决定
   };
 
   const handleCreateResourceAndClose = (workspaceId: string, type: ResourceType) => {
     onCreateResource(workspaceId, type);
-    onClose();
+    // 不自动关闭侧边栏，让用户自己决定
   };
 
   const handleQuickCreate = useCallback(() => {
