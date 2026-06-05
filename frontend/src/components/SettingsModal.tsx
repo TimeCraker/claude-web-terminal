@@ -2,7 +2,7 @@
  * AI Workspace OS - Settings Modal
  *
  * 主题卡片选择器 + 字体选择器。
- * 设计参考朋友建议：无边框、色差分隔、胶囊按钮。
+ * 中文标注 + 英文灰色小字注释。
  */
 
 import React, { useCallback } from 'react';
@@ -35,20 +35,25 @@ const ThemeCard: React.FC<{
     >
       {/* 主题色彩预览条 */}
       <div className="flex gap-1.5 mb-3">
-        <div className="w-6 h-6 rounded-md" style={{ background: c.bg }} title="Background" />
-        <div className="w-6 h-6 rounded-md" style={{ background: c.surfaceLight }} title="Surface" />
-        <div className="w-6 h-6 rounded-md" style={{ background: c.accentPrimary }} title="Accent" />
-        <div className="w-6 h-6 rounded-md" style={{ background: c.accentSecondary }} title="Secondary" />
-        <div className="w-6 h-6 rounded-md" style={{ background: c.success }} title="Success" />
-        <div className="w-6 h-6 rounded-md" style={{ background: c.error }} title="Error" />
+        <div className="w-6 h-6 rounded-md" style={{ background: c.bg }} title="背景 Background" />
+        <div className="w-6 h-6 rounded-md" style={{ background: c.surfaceLight }} title="表面 Surface" />
+        <div className="w-6 h-6 rounded-md" style={{ background: c.accentPrimary }} title="主强调 Primary" />
+        <div className="w-6 h-6 rounded-md" style={{ background: c.accentSecondary }} title="次强调 Secondary" />
+        <div className="w-6 h-6 rounded-md" style={{ background: c.success }} title="成功 Success" />
+        <div className="w-6 h-6 rounded-md" style={{ background: c.error }} title="错误 Error" />
       </div>
 
-      {/* 主题名称 */}
+      {/* 主题名称：中文为主，英文灰色小字 */}
       <div className="flex items-center gap-2">
         <span className="text-lg">{theme.icon}</span>
         <div>
-          <div className="text-sm font-semibold" style={{ color: c.text }}>
-            {theme.name}
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-semibold" style={{ color: c.text }}>
+              {theme.nameZh}
+            </span>
+            <span className="text-[11px]" style={{ color: c.textSecondary }}>
+              {theme.name}
+            </span>
           </div>
           <div className="text-[11px] mt-0.5" style={{ color: c.textSecondary }}>
             {theme.description}
@@ -75,7 +80,7 @@ const ThemeCard: React.FC<{
         <div style={{ color: c.textSecondary }}>
           <span style={{ color: c.accentPrimary }}>$</span> claude --theme {theme.id}
         </div>
-        <div style={{ color: c.success }}>✓ Theme applied successfully</div>
+        <div style={{ color: c.success }}>✓ 主题已应用 Theme applied</div>
       </div>
     </button>
   );
@@ -152,8 +157,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
                 <Icon name="settings" size={16} className="text-theme-accent" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-theme-text">Settings</h2>
-                <p className="text-xs text-theme-text-muted">Customize your workspace</p>
+                <h2 className="text-lg font-bold text-theme-text">设置</h2>
+                <p className="text-xs text-theme-text-muted">自定义你的工作空间 Customize your workspace</p>
               </div>
             </div>
             <button
@@ -166,12 +171,13 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-thin">
-            {/* ===== Theme Section ===== */}
+            {/* ===== 主题选择 ===== */}
             <section>
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-sm font-semibold text-theme-text">Theme</span>
-                <span className="text-[11px] text-theme-text-muted px-2 py-0.5 rounded-full bg-theme-surface-light">
-                  {themes.length} presets
+                <span className="text-sm font-semibold text-theme-text">主题</span>
+                <span className="text-[11px] text-theme-text-muted">Theme</span>
+                <span className="text-[11px] text-theme-text-muted px-2 py-0.5 rounded-full bg-theme-surface-light ml-auto">
+                  {themes.length} 个预设
                 </span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -186,10 +192,11 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               </div>
             </section>
 
-            {/* ===== Font Section ===== */}
+            {/* ===== 字体选择 ===== */}
             <section>
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-sm font-semibold text-theme-text">Terminal Font</span>
+                <span className="text-sm font-semibold text-theme-text">终端字体</span>
+                <span className="text-[11px] text-theme-text-muted">Terminal Font</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {fontOptions.map((font) => (
@@ -206,10 +213,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose })
               </div>
             </section>
 
-            {/* ===== Info Section ===== */}
+            {/* ===== 底部信息 ===== */}
             <section className="text-center pt-4 border-t border-theme-border">
               <p className="text-xs text-theme-text-muted">
-                AI Workspace OS · Theme settings are saved locally
+                AI Workspace OS · 设置自动保存到本地 Settings saved locally
               </p>
             </section>
           </div>

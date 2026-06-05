@@ -66,8 +66,9 @@ export interface XtermTheme {
 
 export interface ThemeDefinition {
   id: string;
-  name: string;
-  description: string;
+  name: string;        // 英文名
+  nameZh: string;      // 中文名
+  description: string;  // 英文描述（灰色小字）
   icon: string; // emoji
   isDark: boolean;
   colors: ThemeColors;
@@ -80,6 +81,7 @@ export interface ThemeDefinition {
 const warpPhenomenon: ThemeDefinition = {
   id: 'warp-phenomenon',
   name: 'Warp Phenomenon',
+  nameZh: '深空蓝紫',
   description: 'Deep space blue-purple. The original default.',
   icon: '🌌',
   isDark: true,
@@ -135,6 +137,7 @@ const warpPhenomenon: ThemeDefinition = {
 const deepSpaceGray: ThemeDefinition = {
   id: 'deep-space-gray',
   name: 'Deep Space Gray',
+  nameZh: '深空灰',
   description: 'Warm orange accents on carbon black. Minimal & cozy.',
   icon: '🪐',
   isDark: true,
@@ -190,6 +193,7 @@ const deepSpaceGray: ThemeDefinition = {
 const arcticLight: ThemeDefinition = {
   id: 'arctic-light',
   name: 'Arctic Light',
+  nameZh: '极地白',
   description: 'Clean white canvas with indigo accents. Easy on the eyes.',
   icon: '❄️',
   isDark: false,
@@ -245,6 +249,7 @@ const arcticLight: ThemeDefinition = {
 const cyberGeek: ThemeDefinition = {
   id: 'cyber-geek',
   name: 'Cyber Geek',
+  nameZh: '赛博终端',
   description: 'Abyss black with electric cyan. Retro terminal reimagined.',
   icon: '💚',
   isDark: true,
@@ -300,6 +305,7 @@ const cyberGeek: ThemeDefinition = {
 const linearDark: ThemeDefinition = {
   id: 'linear-dark',
   name: 'Linear Dark',
+  nameZh: '薰衣草深空',
   description: 'Near-black luxury with lavender-blue accent. Quietly premium.',
   icon: '🔮',
   isDark: true,
@@ -355,6 +361,7 @@ const linearDark: ThemeDefinition = {
 const sunsetWarm: ThemeDefinition = {
   id: 'sunset-warm',
   name: 'Sunset Warm',
+  nameZh: '暮色琥珀',
   description: 'Amber & rose on warm charcoal. Cozy late-night vibes.',
   icon: '🌅',
   isDark: true,

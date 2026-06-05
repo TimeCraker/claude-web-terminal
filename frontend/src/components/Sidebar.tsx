@@ -341,7 +341,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-theme-surface-light hover:bg-theme-surface-elevated rounded-xl text-sm text-theme-text-secondary hover:text-theme-text transition-all duration-200"
           >
             <Icon name="settings" size={14} />
-            <span>Settings</span>
+            <span>设置</span>
           </button>
 
           {isCreating ? (
