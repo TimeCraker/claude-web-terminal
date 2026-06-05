@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { Terminal } from './components/Terminal';
 import { StatusBar } from './components/StatusBar';
 import { SettingsModal } from './components/SettingsModal';
+import { TopBar } from './components/TopBar';
 import { Icon } from './components/Icon';
 import { BrandLogo } from './components/BrandLogo';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -65,22 +66,11 @@ const App: React.FC = () => {
 
   return (
     <div className="h-[100dvh] flex flex-col bg-theme-bg overflow-hidden">
-      {/* 移动端顶栏 —— 汉堡菜单 + 当前工作空间 */}
-      <header className="lg:hidden flex-shrink-0 h-14 bg-theme-surface border-b border-theme-border flex items-center gap-3 px-3">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="w-10 h-10 rounded-xl bg-theme-surface-light flex items-center justify-center text-theme-text active:scale-95 transition-transform"
-          aria-label="Open menu"
-        >
-          <Icon name="menu" size={20} />
-        </button>
-        <div className="flex items-center gap-2 min-w-0">
-          <BrandLogo size={24} />
-          <span className="text-sm font-semibold text-theme-text truncate">
-            {activeWorkspace ? activeWorkspace.name : 'AI Workspace OS'}
-          </span>
-        </div>
-      </header>
+      {/* 极细顶栏 */}
+      <TopBar
+        onToggleSidebar={() => setSidebarOpen((v) => !v)}
+        isSidebarOpen={sidebarOpen}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">

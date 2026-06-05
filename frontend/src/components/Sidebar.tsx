@@ -37,7 +37,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPath, setNewPath] = useState('');
-  const [isCollapsed, setIsCollapsed] = useState(false);
 
   const handleCreate = () => {
     if (newName && newPath) {
@@ -89,52 +88,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  // 桌面端折叠态：仅图标轨道
-  const collapsedRail = (
-    <div
-      className={`${
-        isCollapsed ? 'hidden lg:flex' : 'hidden'
-      } w-16 bg-theme-surface border-r border-theme-border flex-col items-center py-4 h-full`}
-    >
-      <button
-        onClick={() => setIsCollapsed(false)}
-        className="w-10 h-10 rounded-xl bg-theme-surface-light hover:bg-theme-surface-elevated hover-glow flex items-center justify-center text-theme-text-secondary hover:text-theme-text transition-all duration-200 mb-4"
-        title="Expand sidebar"
-      >
-        <Icon name="chevron-right" size={18} />
-      </button>
-
-      <div className="flex-1 flex flex-col items-center gap-3 overflow-y-auto scrollbar-thin">
-        {workspaces.map((workspace) => (
-          <button
-            key={workspace.id}
-            onClick={() => {
-              setActiveWorkspace(workspace.id);
-              setIsCollapsed(false);
-            }}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover-glow ${
-              activeWorkspaceId === workspace.id
-                ? 'glow-active bg-theme-accent/15 border border-theme-accent/20 text-theme-text'
-                : 'hover:bg-theme-surface-light text-theme-text-secondary'
-            }`}
-            title={workspace.name}
-          >
-            <Icon name={workspace.icon} size={18} />
-          </button>
-        ))}
-      </div>
-
-      <button
-        onClick={() => sendMessage({ type: 'workspace:quick_create' })}
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-theme-bg hover:scale-105 hover-glow transition-all duration-200 mt-4"
-        style={{ background: 'linear-gradient(to right, var(--theme-gradient-from), var(--theme-gradient-to))' }}
-        title="Quick Create Workspace"
-      >
-        <Icon name="zap" size={18} />
-      </button>
-    </div>
-  );
-
   return (
     <>
       {/* 移动端遮罩 */}
@@ -145,32 +98,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
         }`}
       />
 
-      {collapsedRail}
-
-      {/* 展开面板 */}
+      {/* 侧边栏 - 无残留全折叠 */}
       <aside
         className={`fixed lg:static inset-y-0 left-0 z-50 w-72 max-w-[82vw] lg:max-w-none
           bg-theme-surface border-r border-theme-border flex flex-col h-full
-          transition-transform duration-300 ease-out
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          ${isCollapsed ? 'lg:hidden' : 'lg:translate-x-0 lg:flex'}`}
+          transition-all duration-300 ease-in-out overflow-hidden
+          ${isOpen ? 'w-72 opacity-100' : 'w-0 opacity-0 lg:w-0 lg:opacity-0'}`}
+        style={{
+          minWidth: isOpen ? '288px' : '0px',
+        }}
       >
         {/* Header */}
         <div className="p-4 border-b border-theme-border flex items-center justify-between flex-shrink-0">
           <BrandLogo size={32} showText />
           <button
-            onClick={() => setIsCollapsed(true)}
-            className="hidden lg:flex w-8 h-8 rounded-lg bg-theme-surface-light hover:bg-theme-surface-elevated items-center justify-center text-theme-text-muted hover:text-theme-text-secondary transition-all duration-200"
-            title="Collapse sidebar"
+            onClick={onClose}
+            className="w-8 h-8 rounded-lg bg-theme-surface-light hover:bg-theme-surface-elevated items-center justify-center text-theme-text-muted hover:text-theme-text-secondary transition-all duration-200"
+            title="Close sidebar"
           >
             <Icon name="chevron-left" size={16} />
-          </button>
-          <button
-            onClick={onClose}
-            className="lg:hidden w-8 h-8 rounded-lg bg-theme-surface-light flex items-center justify-center text-theme-text-secondary active:scale-95"
-            title="Close"
-          >
-            <Icon name="x" size={16} />
           </button>
         </div>
 

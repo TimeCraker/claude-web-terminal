@@ -76,22 +76,22 @@ export interface ThemeDefinition {
 }
 
 // ============================================================
-// Theme 1: Warp Phenomenon（当前默认 - 暗蓝紫）
+// Theme 1: Warp Phenomenon（当前默认 - Warp 风格高级灰）
 // ============================================================
 const warpPhenomenon: ThemeDefinition = {
   id: 'warp-phenomenon',
   name: 'Warp Phenomenon',
   nameZh: '深空蓝紫',
-  description: 'Deep space blue-purple. The original default.',
+  description: 'Matte deep space gray with blue-purple accents. Inspired by Warp.',
   icon: '🌌',
   isDark: true,
   colors: {
-    bg: '#1C1D22',
-    surface: '#16171B',
-    surfaceLight: '#25262C',
-    surfaceElevated: '#2D2E36',
-    border: '#2C2E35',
-    borderStrong: '#3A3C44',
+    bg: '#1A1A2E',
+    surface: '#16213E',
+    surfaceLight: '#1F2B47',
+    surfaceElevated: '#253550',
+    border: 'rgba(83, 216, 251, 0.1)',
+    borderStrong: 'rgba(83, 216, 251, 0.2)',
     text: '#E4E6EB',
     textSecondary: '#9CA3AF',
     textMuted: '#6B7280',
@@ -100,19 +100,19 @@ const warpPhenomenon: ThemeDefinition = {
     success: '#A8E6CF',
     warning: '#FFD3B6',
     error: '#FF6B6B',
-    glowPrimary: 'rgba(83, 216, 251, 0.15)',
-    glowSecondary: 'rgba(157, 78, 221, 0.15)',
+    glowPrimary: 'rgba(83, 216, 251, 0.12)',
+    glowSecondary: 'rgba(157, 78, 221, 0.12)',
     gradientFrom: '#53D8FB',
     gradientTo: '#9D4EDD',
   },
   xterm: {
-    background: '#1C1D22',
+    background: '#1A1A2E',
     foreground: '#E4E6EB',
     cursor: '#53D8FB',
-    cursorAccent: '#1C1D22',
+    cursorAccent: '#1A1A2E',
     selectionBackground: 'rgba(83, 216, 251, 0.2)',
     selectionForeground: '#ffffff',
-    black: '#1C1D22',
+    black: '#1A1A2E',
     red: '#FF6B6B',
     green: '#A8E6CF',
     yellow: '#FFD3B6',
