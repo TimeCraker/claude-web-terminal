@@ -157,19 +157,22 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
       {/* 终端渲染区域 */}
       <div
         className="flex-1 min-h-0 overflow-hidden relative cursor-text"
-        onClick={() => inputRef.current?.focus()}
+        onClick={(e) => {
+          // 移动端：点击终端区域时聚焦到输入框
+          if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.xterm')) {
+            inputRef.current?.focus();
+          }
+        }}
       >
         <div
           ref={containerRef}
-          tabIndex={0}
+          tabIndex={-1}
           className="absolute inset-1.5 sm:inset-3 rounded-xl overflow-hidden focus:outline-none"
           style={{
             background: 'var(--theme-bg)',
             boxShadow: 'inset 0 0 30px rgba(255,255,255,0.02), 0 0 0 1px var(--theme-border)',
-          }}
-          onFocus={() => {
-            const textarea = containerRef.current?.querySelector('.xterm-helper-textarea') as HTMLTextAreaElement;
-            textarea?.focus();
+            // 移动端：允许触摸滚动
+            touchAction: 'pan-x pan-y',
           }}
         />
       </div>
@@ -191,13 +194,19 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
               onKeyDown={handleKeyDown}
               placeholder="Type a command..."
               rows={1}
+              inputMode="text"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               className="flex-1 bg-transparent text-theme-text placeholder-theme-text-muted resize-none py-3 pr-2 focus:outline-none font-mono text-base sm:text-sm leading-relaxed"
-              style={{ minHeight: '44px', maxHeight: MAX_INPUT_HEIGHT }}
+              style={{ minHeight: '44px', maxHeight: MAX_INPUT_HEIGHT, touchAction: 'manipulation' }}
             />
             <button
               onClick={handleSubmit}
               disabled={!inputValue.trim()}
-              className="mr-2 mb-2 px-3 py-1.5 bg-theme-text text-theme-bg rounded-lg text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-theme-glow active:scale-95 transition-all duration-200"
+              className="mr-2 mb-2 px-3 py-2 bg-theme-text text-theme-bg rounded-lg text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-theme-glow active:scale-95 transition-all duration-200"
+              style={{ minWidth: '52px', minHeight: '36px' }}
             >
               Send
             </button>

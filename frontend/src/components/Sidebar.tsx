@@ -151,7 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`fixed lg:static inset-y-0 left-0 z-50 w-72 max-w-[82vw] lg:max-w-none
           bg-theme-surface border-r border-theme-border flex flex-col h-full
           transition-all duration-300 ease-in-out overflow-hidden
-          ${isOpen ? 'w-72 opacity-100' : 'w-0 opacity-0 lg:w-0 lg:opacity-0'}`}
+          ${isOpen ? 'w-72 opacity-100' : 'w-0 opacity-0 lg:w-0 lg:opacity-0 pointer-events-none lg:pointer-events-auto'}`}
         style={{
           minWidth: isOpen ? '288px' : '0px',
         }}
