@@ -18,8 +18,31 @@ const App: React.FC = () => {
   const isSettingsOpen = useThemeStore((s) => s.isSettingsOpen);
   const closeSettings = useThemeStore((s) => s.closeSettings);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createCooldown, setCreateCooldown] = useState(0);
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+
+  // 冷却计时器
+  React.useEffect(() => {
+    if (createCooldown > 0) {
+      const timer = setTimeout(() => setCreateCooldown(createCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [createCooldown]);
+
+  // 监听工作区创建完成（当有新工作区被添加时）
+  const prevWorkspaceCountRef = React.useRef(workspaces.length);
+  React.useEffect(() => {
+    if (isCreating && workspaces.length > prevWorkspaceCountRef.current) {
+      // 新工作区已创建，延迟关闭加载状态
+      const timer = setTimeout(() => {
+        setIsCreating(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+    prevWorkspaceCountRef.current = workspaces.length;
+  }, [workspaces, isCreating]);
 
   const handleCreateWorkspace = (name: string, path: string) => {
     const icons = ['terminal', 'folder', 'box', 'wrench', 'target', 'layers', 'globe', 'sparkles'];
@@ -126,11 +149,36 @@ const App: React.FC = () => {
                 {/* Quick Actions */}
                 <div className="flex gap-3 justify-center">
                   <button
-                    onClick={() => sendMessage({ type: 'workspace:quick_create' })}
-                    className="px-4 py-2 bg-theme-surface-light rounded-xl border border-theme-border text-xs text-theme-text-secondary flex items-center gap-2 hover:text-theme-text hover:border-theme-border-strong hover:bg-theme-surface-elevated transition-all active:scale-95 cursor-pointer"
+                    onClick={() => {
+                      if (createCooldown > 0 || isCreating) return;
+                      sendMessage({ type: 'workspace:quick_create' });
+                      setSidebarOpen(true);
+                      setIsCreating(true);
+                      setCreateCooldown(5);
+                    }}
+                    disabled={createCooldown > 0 || isCreating}
+                    className={`px-4 py-2 rounded-xl border text-xs flex items-center gap-2 transition-all active:scale-95 ${
+                      createCooldown > 0 || isCreating
+                        ? 'bg-theme-surface-light/50 border-theme-border/50 text-theme-text-muted cursor-not-allowed'
+                        : 'bg-theme-surface-light border-theme-border text-theme-text-secondary hover:text-theme-text hover:border-theme-border-strong hover:bg-theme-surface-elevated cursor-pointer'
+                    }`}
                   >
-                    <Icon name="zap" size={14} className="text-theme-accent" />
-                    <span>Quick create</span>
+                    {isCreating ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-theme-accent border-t-transparent rounded-full animate-spin" />
+                        <span>生成中...</span>
+                      </>
+                    ) : createCooldown > 0 ? (
+                      <>
+                        <Icon name="zap" size={14} className="text-theme-text-muted" />
+                        <span>等待 {createCooldown}s</span>
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="zap" size={14} className="text-theme-accent" />
+                        <span>Quick create</span>
+                      </>
+                    )}
                   </button>
                   <button
                     onClick={() => setSidebarOpen(true)}
@@ -140,6 +188,14 @@ const App: React.FC = () => {
                     <span>Custom workspace</span>
                   </button>
                 </div>
+
+                {/* 生成中提示 */}
+                {isCreating && (
+                  <div className="mt-4 flex items-center justify-center gap-2 text-sm text-theme-text-secondary">
+                    <div className="w-2 h-2 bg-theme-accent rounded-full animate-pulse" />
+                    <span>AI 智能体工作区正在生成中...</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
