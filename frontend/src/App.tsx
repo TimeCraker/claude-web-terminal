@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Terminal } from './components/Terminal';
 import { StatusBar } from './components/StatusBar';
-import { SettingsModal } from './components/SettingsModal';
+import { SettingsPanel } from './components/SettingsPanel';
 import { TopBar } from './components/TopBar';
 import { Icon } from './components/Icon';
 import { BrandLogo } from './components/BrandLogo';
@@ -205,8 +205,8 @@ const App: React.FC = () => {
       {/* Status Bar */}
       <StatusBar />
 
-      {/* Settings Modal */}
-      <SettingsModal isOpen={isSettingsOpen} onClose={closeSettings} />
+      {/* Settings Panel (右侧边栏) */}
+      <SettingsPanel isOpen={isSettingsOpen} onClose={closeSettings} />
     </div>
   );
 };
