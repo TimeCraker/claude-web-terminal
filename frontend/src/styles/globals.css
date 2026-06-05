@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* AI Workspace OS - Warp Phenomenon Theme */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: #1C1D22;
+  color: #E4E6EB;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Menlo', monospace;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(44, 46, 53, 0.6);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(55, 57, 65, 0.8);
+}
+
+/* xterm.js 容器 */
+.terminal-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.xterm {
+  padding: 16px;
+  height: 100%;
+  width: 100%;
+}
+
+.xterm-viewport {
+  overflow-y: auto !important;
+}
+
+/* xterm screen 容器 */
+.xterm-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 选择文本样式 */
+.xterm .xterm-selection {
+  opacity: 1;
+}
+
+.xterm .xterm-selection div {
+  background: rgba(83, 216, 251, 0.15) !important;
+}
+
+/* 渐变文字 */
+.gradient-text {
+  background: linear-gradient(135deg, #53D8FB, #9D4EDD);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .xterm {
+    padding: 10px;
+    font-size: 12px;
+  }
+}
+
+/* 按钮激活效果 */
+button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* 输入框 placeholder */
+input::placeholder {
+  color: #6B7280;
+}
+
+/* 焦点环 */
+input:focus {
+  outline: none;
+}
