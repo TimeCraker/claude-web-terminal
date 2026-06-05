@@ -133,8 +133,23 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
       setTimeout(() => {
         document.documentElement.classList.remove('theme-transitioning');
       }, 350);
+      // 延迟关闭面板，让用户看到主题切换效果
+      setTimeout(() => {
+        onClose();
+      }, 500);
     },
-    [setTheme]
+    [setTheme, onClose]
+  );
+
+  // 字体切换后关闭面板
+  const handleFontChange = useCallback(
+    (id: FontFamily) => {
+      setFont(id);
+      setTimeout(() => {
+        onClose();
+      }, 300);
+    },
+    [setFont, onClose]
   );
 
   return (
@@ -212,7 +227,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({ isOpen, onClose })
                   family={font.family}
                   sample={font.sample}
                   isActive={fontId === font.id}
-                  onSelect={setFont}
+                  onSelect={handleFontChange}
                 />
               ))}
             </div>
