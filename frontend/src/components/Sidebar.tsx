@@ -95,14 +95,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
     // 发送删除消息
     onDeleteResource(workspaceId, resourceId);
 
-    // 延迟清除状态
+    // 3秒后清除关闭状态（防止后端没有响应时按钮一直转圈）
     setTimeout(() => {
       setClosingResources(prev => {
         const next = new Set(prev);
         next.delete(resourceId);
         return next;
       });
-    }, 2000);
+    }, 3000);
   }, [closingResources, onDeleteResource]);
 
   const getStatusColor = (status: string) => {

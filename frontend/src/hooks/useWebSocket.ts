@@ -109,7 +109,31 @@ export function useWebSocket() {
         case 'resource:output':
         case 'resource:status':
         case 'resource:snapshot':
+          window.dispatchEvent(
+            new CustomEvent('ws:resource', { detail: message })
+          );
+          break;
+
         case 'resource:deleted':
+          // 更新 sessionStore，从 workspaces 中移除被删除的资源
+          const state = useSessionStore.getState();
+          const updatedWorkspaces = state.workspaces.map(workspace => {
+            if (workspace.id === message.workspaceId) {
+              return {
+                ...workspace,
+                resources: workspace.resources.filter(r => r.id !== message.resourceId),
+              };
+            }
+            return workspace;
+          });
+          state.setWorkspaces(updatedWorkspaces);
+
+          // 如果删除的是当前活跃的资源，清除活跃状态
+          if (state.activeResourceId === message.resourceId) {
+            state.setActiveResource(null);
+          }
+
+          // 派发事件给终端处理
           window.dispatchEvent(
             new CustomEvent('ws:resource', { detail: message })
           );
