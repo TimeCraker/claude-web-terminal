@@ -18,6 +18,10 @@
 - **智能滚动** — 上翻查看历史时不被新内容拉回
 - **一键创建工作空间** — 自动递增命名 (workspace1/2/3...)，自动创建服务器目录
 - **响应式布局** — 桌面端侧边栏可折叠，移动端自适应
+- **多主题系统** — 6 个预设主题（深空蓝紫 / 深空灰 / 极地白 / 赛博终端 / 薰衣草深空 / 暮色琥珀），一键切换
+- **字体切换** — 4 种等宽字体可选（JetBrains Mono / Fira Code / Cascadia Code / Source Code Pro）
+- **主题光晕交互** — 卡片和按钮 hover 时亮起对应主题色光晕，增强交互感
+- **本地持久化** — 主题和字体偏好自动保存到 localStorage
 
 ## 技术栈
 
@@ -245,25 +249,23 @@ curl http://localhost:3100/health
 
 ## 设计系统
 
-### 色彩 (Warp Phenomenon Theme)
+### 主题系统 (v1.0.1)
 
-| 角色 | 色值 |
-|-----|------|
-| 背景 | `#1C1D22` |
-| 表面 | `#25262C` |
-| 边框 | `#2D2E36` |
-| 主强调 (蓝) | `#53D8FB` |
-| 主强调 (紫) | `#9D4EDD` |
-| 正文 | `#E4E6EB` |
-| 次要文字 | `#A1A1AA` |
-| 禁用文字 | `#6B7280` |
-| 成功 | `#A8E6CF` |
-| 错误 | `#FF6B6B` |
+6 个预设主题，通过 CSS 自定义属性实现，支持运行时热切换：
+
+| 主题 | 风格 | 主强调色 |
+|-----|------|---------|
+| 🌌 Warp Phenomenon | 暗蓝紫（默认） | `#53D8FB` / `#9D4EDD` |
+| 🪐 Deep Space Gray | 暖橙极简 | `#FF6B4A` / `#8B5CF6` |
+| ❄️ Arctic Light | 明亮极简 | `#111827` / `#374151` |
+| 💚 Cyber Geek | 赛博终端 | `#06B6D4` / `#34D399` |
+| 🔮 Linear Dark | 薰衣草深空 | `#5E6AD2` / `#7A7FAD` |
+| 🌅 Sunset Warm | 暮色琥珀 | `#D4856A` / `#C07A5E` |
 
 ### 字体
 
 ```
-JetBrains Mono > Fira Code > Cascadia Code > Menlo > monospace
+JetBrains Mono > Fira Code > Cascadia Code > Source Code Pro > monospace
 ```
 
 ### 图标
