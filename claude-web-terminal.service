@@ -1,0 +1,19 @@
+[Unit]
+Description=Claude Web Terminal - AI Workspace OS
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/claude-web-terminal/backend
+Environment=PATH=/usr/local/node20/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=-/opt/claude-remote-bot/.env
+ExecStart=/usr/local/bin/npx tsx src/index.ts
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

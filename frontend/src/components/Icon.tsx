@@ -224,6 +224,55 @@ export const Icon: React.FC<IconProps> = ({ name, className = '', size = 16 }) =
         </svg>
       );
 
+    case 'copy':
+      return (
+        <svg {...props}>
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      );
+
+    case 'clipboard':
+      return (
+        <svg {...props}>
+          <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+          <rect x="8" y="2" width="8" height="4" rx="1" ry="1" />
+        </svg>
+      );
+
+    case 'search':
+      return (
+        <svg {...props}>
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+      );
+
+    case 'lock':
+      return (
+        <svg {...props}>
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+      );
+
+    case 'alert-circle':
+      return (
+        <svg {...props}>
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      );
+
+    case 'check-circle':
+      return (
+        <svg {...props}>
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+      );
+
     default:
       // 默认文件夹图标
       return (

@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebglAddon } from '@xterm/addon-webgl';
+import { SearchAddon } from '@xterm/addon-search';
 import { useSessionStore } from '../store/sessionStore';
 import { useThemeStore } from '../themes/useThemeStore';
 import { ClientMessage, ServerMessage, TerminalSnapshot } from '../types';
@@ -18,6 +19,7 @@ function getFontFamily() {
 interface TerminalInstance {
   terminal: Terminal;
   fitAddon: FitAddon;
+  searchAddon: SearchAddon;
   container: HTMLDivElement;
   wrapper: HTMLDivElement;
   resizeObserver: ResizeObserver;
@@ -162,7 +164,9 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       });
 
       const fitAddon = new FitAddon();
+      const searchAddon = new SearchAddon();
       terminal.loadAddon(fitAddon);
+      terminal.loadAddon(searchAddon);
 
       try {
         const webglAddon = new WebglAddon();
@@ -170,6 +174,20 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       } catch {
         console.warn('WebGL not available, falling back to canvas renderer');
       }
+
+      // 监听选中文本变化
+      terminal.onSelectionChange(() => {
+        const selection = terminal.getSelection();
+        if (selection) {
+          window.dispatchEvent(new CustomEvent('terminal:selection', {
+            detail: { text: selection, resourceId }
+          }));
+        } else {
+          window.dispatchEvent(new CustomEvent('terminal:selection', {
+            detail: { text: '', resourceId }
+          }));
+        }
+      });
 
       const wrapper = document.createElement('div');
       wrapper.className = 'terminal-wrapper';
@@ -179,6 +197,7 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       const instance: TerminalInstance = {
         terminal,
         fitAddon,
+        searchAddon,
         container,
         wrapper,
         resizeObserver: null as unknown as ResizeObserver,
@@ -364,10 +383,38 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
     return () => window.removeEventListener('ws:resource', handleResourceEvent);
   }, [writeToTerminal, restoreSnapshot, disposeTerminal]);
 
+  // 搜索功能
+  const search = useCallback((term: string) => {
+    if (!activeResourceId) return;
+    const instance = terminalPool.get(activeResourceId);
+    if (instance) {
+      instance.searchAddon.findNext(term);
+    }
+  }, [activeResourceId]);
+
+  const searchPrevious = useCallback((term: string) => {
+    if (!activeResourceId) return;
+    const instance = terminalPool.get(activeResourceId);
+    if (instance) {
+      instance.searchAddon.findPrevious(term);
+    }
+  }, [activeResourceId]);
+
+  const clearSearch = useCallback(() => {
+    if (!activeResourceId) return;
+    const instance = terminalPool.get(activeResourceId);
+    if (instance) {
+      instance.searchAddon.clearDecorations();
+    }
+  }, [activeResourceId]);
+
   return {
     switchTerminal,
     writeToTerminal,
     disposeTerminal,
     fitTerminal,
+    search,
+    searchPrevious,
+    clearSearch,
   };
 }
