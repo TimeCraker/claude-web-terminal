@@ -15,9 +15,18 @@ export let wsSessionId = 0;
 
 const pendingMessages: ClientMessage[] = [];
 
+// 重连配置
+const RECONNECT_CONFIG = {
+  baseDelay: 1000,      // 初始延迟 1 秒
+  maxDelay: 30000,      // 最大延迟 30 秒
+  maxAttempts: Infinity, // 无限重试
+};
+
 export function useWebSocket() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef(0);
+  const isConnectingRef = useRef(false);
 
   const {
     setWorkspaces,
@@ -150,12 +159,34 @@ export function useWebSocket() {
     [setWorkspaces, addWorkspace, updateWorkspace, removeWorkspace, syncSelectionWithServer]
   );
 
+  const getReconnectDelay = useCallback(() => {
+    const { baseDelay, maxDelay } = RECONNECT_CONFIG;
+    // 指数退避：1s, 2s, 4s, 8s, 16s, 30s, 30s, ...
+    const delay = Math.min(baseDelay * Math.pow(2, reconnectAttemptsRef.current), maxDelay);
+    // 添加抖动（±20%）
+    const jitter = delay * 0.2 * (Math.random() * 2 - 1);
+    return Math.max(0, delay + jitter);
+  }, []);
+
   const connect = useCallback(() => {
+    // 防止重复连接
+    if (isConnectingRef.current) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    if (wsRef.current?.readyState === WebSocket.CONNECTING) return;
+
+    isConnectingRef.current = true;
+
+    // 清除之前的重连定时器
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
 
     const ws = new WebSocket(WS_URL);
 
     ws.onopen = () => {
+      isConnectingRef.current = false;
+      reconnectAttemptsRef.current = 0; // 重置重连计数
       wsSessionId += 1;
       setConnected(true);
       flushQueue();
@@ -176,20 +207,41 @@ export function useWebSocket() {
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+      isConnectingRef.current = false;
       setConnected(false);
       wsRef.current = null;
-      reconnectTimeoutRef.current = window.setTimeout(() => {
-        connect();
-      }, 3000);
+
+      // 如果不是主动关闭，尝试重连
+      if (!event.wasClean) {
+        reconnectAttemptsRef.current += 1;
+        const delay = getReconnectDelay();
+
+        console.log(`🔄 WebSocket disconnected, reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttemptsRef.current})`);
+
+        // 派发重连事件
+        window.dispatchEvent(
+          new CustomEvent('ws:reconnecting', {
+            detail: {
+              attempt: reconnectAttemptsRef.current,
+              delay: Math.round(delay / 1000),
+            },
+          })
+        );
+
+        reconnectTimeoutRef.current = window.setTimeout(() => {
+          connect();
+        }, delay);
+      }
     };
 
-    ws.onerror = () => {
-      console.error('❌ WebSocket error');
+    ws.onerror = (error) => {
+      isConnectingRef.current = false;
+      console.error('❌ WebSocket error:', error);
     };
 
     wsRef.current = ws;
-  }, [setConnected, flushQueue, sendMessage, handleMessage]);
+  }, [setConnected, flushQueue, sendMessage, handleMessage, getReconnectDelay]);
 
   useEffect(() => {
     connect();

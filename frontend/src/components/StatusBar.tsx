@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSessionStore } from '../store/sessionStore';
 import { Icon } from './Icon';
 
@@ -14,6 +14,42 @@ const getIconName = (icon: string): string => {
 export const StatusBar: React.FC = () => {
   const { isConnected, activeWorkspaceId, activeResourceId, workspaces } =
     useSessionStore();
+
+  const [reconnectInfo, setReconnectInfo] = useState<{
+    attempt: number;
+    delay: number;
+  } | null>(null);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // 监听重连事件
+  useEffect(() => {
+    const handleReconnecting = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      setReconnectInfo(detail);
+    };
+
+    const handleConnected = () => {
+      setReconnectInfo(null);
+    };
+
+    const handleError = (event: Event) => {
+      const message = (event as CustomEvent).detail;
+      setErrorMessage(message);
+      // 5 秒后自动清除错误
+      setTimeout(() => setErrorMessage(null), 5000);
+    };
+
+    window.addEventListener('ws:reconnecting', handleReconnecting);
+    window.addEventListener('ws:connected', handleConnected);
+    window.addEventListener('ws:error', handleError);
+
+    return () => {
+      window.removeEventListener('ws:reconnecting', handleReconnecting);
+      window.removeEventListener('ws:connected', handleConnected);
+      window.removeEventListener('ws:error', handleError);
+    };
+  }, []);
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
   const activeResource = activeWorkspace?.resources.find(
@@ -55,20 +91,40 @@ export const StatusBar: React.FC = () => {
     }
   };
 
+  const getConnectionStatus = () => {
+    if (isConnected) {
+      return {
+        text: 'Connected',
+        color: 'bg-theme-success shadow-[0_0_6px_rgba(52,211,153,0.5)]',
+        textColor: 'text-theme-text-muted',
+      };
+    }
+
+    if (reconnectInfo) {
+      return {
+        text: `Reconnecting (${reconnectInfo.attempt})...`,
+        color: 'bg-theme-warning animate-pulse',
+        textColor: 'text-theme-warning',
+      };
+    }
+
+    return {
+      text: 'Disconnected',
+      color: 'bg-theme-error',
+      textColor: 'text-theme-error',
+    };
+  };
+
+  const connectionStatus = getConnectionStatus();
+
   return (
     <div className="h-9 bg-theme-surface border-t border-theme-border flex items-center px-3 sm:px-4 text-xs overflow-hidden">
       {/* Left side */}
       <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         <div className="flex items-center gap-2 flex-shrink-0">
-          <div
-            className={`w-1.5 h-1.5 rounded-full ${
-              isConnected
-                ? 'bg-theme-success shadow-[0_0_6px_rgba(52,211,153,0.5)]'
-                : 'bg-theme-error'
-            }`}
-          />
-          <span className="text-theme-text-muted hidden sm:inline">
-            {isConnected ? 'Connected' : 'Disconnected'}
+          <div className={`w-1.5 h-1.5 rounded-full ${connectionStatus.color}`} />
+          <span className={`${connectionStatus.textColor} hidden sm:inline`}>
+            {connectionStatus.text}
           </span>
         </div>
 
@@ -76,6 +132,14 @@ export const StatusBar: React.FC = () => {
           <div className="flex items-center gap-2 text-theme-text-muted min-w-0">
             <Icon name={getIconName(activeWorkspace.icon)} size={12} className="text-theme-text-muted flex-shrink-0" />
             <span className="truncate">{activeWorkspace.name}</span>
+          </div>
+        )}
+
+        {/* 错误消息 */}
+        {errorMessage && (
+          <div className="flex items-center gap-1.5 text-theme-error animate-fade-in">
+            <Icon name="alert-circle" size={12} />
+            <span className="truncate max-w-[200px]">{errorMessage}</span>
           </div>
         )}
       </div>
