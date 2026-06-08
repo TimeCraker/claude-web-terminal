@@ -154,6 +154,26 @@ html.theme-transitioning *::after {
   animation: fade-in 0.3s ease-out;
 }
 
+/* 粘贴按钮光晕效果 - 1.5秒后熄灭 */
+@keyframes paste-glow {
+  0% {
+    box-shadow: 0 0 16px 4px rgba(83, 216, 251, 0.5);
+    border-color: rgba(83, 216, 251, 0.8);
+  }
+  60% {
+    box-shadow: 0 0 12px 2px rgba(83, 216, 251, 0.3);
+    border-color: rgba(83, 216, 251, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0px 0px rgba(83, 216, 251, 0);
+    border-color: rgba(83, 216, 251, 0.2);
+  }
+}
+
+.animate-paste-glow {
+  animation: paste-glow 1.5s ease-out forwards;
+}
+
 /* ============================================================
    Hover Glow Effect — 主题色光晕交互
    ============================================================ */
@@ -209,12 +229,30 @@ html.theme-transitioning *::after {
 @media (max-width: 639px) {
   .xterm {
     padding: 6px;
-    font-size: 12px;
+    font-size: 11px;
+    line-height: 1.3;
   }
 
-  /* xterm 触摸优化 - 不禁用 user-select 以允许输入 */
-  .xterm-screen {
-    touch-action: pan-x pan-y;
+  /* 移动端隐藏滚动条但保留功能 */
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* ============================================================
+   Responsive Typography — 响应式字体
+   ============================================================ */
+@media (max-width: 374px) {
+  /* 超小屏幕 (< 375px, 如 iPhone SE) */
+  .text-xs {
+    font-size: 0.65rem;
+  }
+  .text-sm {
+    font-size: 0.775rem;
   }
 }
 
@@ -231,4 +269,27 @@ textarea, input {
   -webkit-user-select: text;
   user-select: text;
   touch-action: manipulation;
+}
+
+/* ============================================================
+   Mobile Performance — 移动端性能优化
+   ============================================================ */
+@media (max-width: 639px) {
+  /* 减少动画复杂度以提升性能 */
+  .animate-pulse {
+    animation-duration: 3s;
+  }
+}
+
+/* ============================================================
+   Smooth Scrolling — 平滑滚动
+   ============================================================ */
+* {
+  scroll-behavior: smooth;
+}
+
+/* 禁用某些元素的平滑滚动以提升响应速度 */
+.overflow-x-auto,
+.overflow-y-auto {
+  scroll-behavior: auto;
 }

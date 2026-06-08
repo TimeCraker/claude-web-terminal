@@ -4,6 +4,7 @@ import { ResourceType, ClientMessage } from '../types';
 import { Icon } from './Icon';
 import { BrandLogo } from './BrandLogo';
 import { useThemeStore } from '../themes/useThemeStore';
+import { triggerGuideConfirm } from './GuideConfirmDialog';
 
 interface SidebarProps {
   sendMessage: (message: ClientMessage) => void;
@@ -73,12 +74,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleSelectResource = (resourceId: string) => {
     setActiveResource(resourceId);
-    // 不自动关闭侧边栏，让用户自己决定
+    // 移动端自动关闭侧边栏
+    if (window.innerWidth < 1024) {
+      onClose();
+    }
   };
 
   const handleCreateResourceAndClose = (workspaceId: string, type: ResourceType) => {
     onCreateResource(workspaceId, type);
-    // 不自动关闭侧边栏，让用户自己决定
+
+    // 移动端自动关闭侧边栏
+    if (window.innerWidth < 1024) {
+      onClose();
+    }
+
+    // 触发新手引导确认对话框
+    triggerGuideConfirm();
   };
 
   const handleQuickCreate = useCallback(() => {
@@ -148,12 +159,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* 侧边栏 - 无残留全折叠 */}
       <aside
-        className={`fixed lg:static inset-y-0 left-0 z-50 w-72 max-w-[82vw] lg:max-w-none
+        data-guide="sidebar"
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-[85vw] sm:w-72 max-w-[320px] lg:max-w-none
           bg-theme-surface border-r border-theme-border flex flex-col h-full
           transition-all duration-300 ease-in-out overflow-hidden
-          ${isOpen ? 'w-72 opacity-100' : 'w-0 opacity-0 lg:w-0 lg:opacity-0 pointer-events-none lg:pointer-events-auto'}`}
+          ${isOpen ? 'opacity-100' : 'w-0 opacity-0 lg:w-0 lg:opacity-0 pointer-events-none lg:pointer-events-auto'}`}
         style={{
-          minWidth: isOpen ? '288px' : '0px',
+          minWidth: isOpen ? 'min(288px, 85vw)' : '0px',
         }}
       >
         {/* Header */}
@@ -295,20 +307,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         key={type}
                         onClick={() => handleCreateResourceAndClose(workspace.id, type)}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 bg-theme-surface-light/30 hover:bg-theme-surface-light/60 hover-glow rounded-md transition-all group/btn"
+                        className="w-full flex items-center gap-2 px-3 py-2 sm:px-2 sm:py-1.5 bg-theme-surface-light/30 hover:bg-theme-surface-light/60 hover-glow rounded-md transition-all group/btn min-h-[44px] sm:min-h-0"
                         title={`New ${type}`}
                       >
                         <Icon
                           name="plus"
-                          size={12}
-                          className="text-theme-text-muted group-hover/btn:text-theme-text-secondary"
+                          size={14}
+                          className="text-theme-text-muted group-hover/btn:text-theme-text-secondary sm:w-3 sm:h-3"
                         />
                         <Icon
                           name={getResourceIconName(type)}
-                          size={12}
-                          className="text-theme-text-muted group-hover/btn:text-theme-text-secondary"
+                          size={14}
+                          className="text-theme-text-muted group-hover/btn:text-theme-text-secondary sm:w-3 sm:h-3"
                         />
-                        <span className="text-xs text-theme-text-secondary group-hover/btn:text-theme-text ml-0.5">
+                        <span className="text-sm sm:text-xs text-theme-text-secondary group-hover/btn:text-theme-text ml-0.5">
                           {label}
                         </span>
                       </button>
@@ -321,12 +333,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Create Workspace + Settings */}
-        <div className="p-4 border-t border-theme-border space-y-2 flex-shrink-0">
+        <div className="p-3 sm:p-4 border-t border-theme-border space-y-2 flex-shrink-0">
           <div className="flex gap-2">
             <button
               onClick={handleQuickCreate}
               disabled={quickCreateCooldown > 0 || isQuickCreating}
-              className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 ${
+              className={`flex-1 px-4 py-3 sm:py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 flex items-center justify-center gap-2 min-h-[48px] sm:min-h-0 ${
                 quickCreateCooldown > 0 || isQuickCreating
                   ? 'bg-theme-surface-light/50 text-theme-text-muted cursor-not-allowed'
                   : 'text-theme-bg hover:scale-[1.02] hover-glow'
@@ -353,7 +365,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
             <button
               onClick={() => setIsCreating((v) => !v)}
-              className="flex-1 px-4 py-2.5 bg-theme-text text-theme-bg rounded-xl text-sm font-semibold hover:scale-[1.02] hover-glow transition-all duration-300 flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-3 sm:py-2.5 bg-theme-text text-theme-bg rounded-xl text-sm font-semibold hover:scale-[1.02] hover-glow transition-all duration-300 flex items-center justify-center gap-2 min-h-[48px] sm:min-h-0"
             >
               <Icon name="plus" size={14} />
               <span>Custom</span>
@@ -371,7 +383,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Settings Button */}
           <button
             onClick={openSettings}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-theme-surface-light hover:bg-theme-surface-elevated hover-glow rounded-xl text-sm text-theme-text-secondary hover:text-theme-text transition-all duration-200 border border-transparent hover:border-theme-border"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 sm:py-2 bg-theme-surface-light hover:bg-theme-surface-elevated hover-glow rounded-xl text-sm text-theme-text-secondary hover:text-theme-text transition-all duration-200 border border-transparent hover:border-theme-border min-h-[48px] sm:min-h-0"
           >
             <Icon name="settings" size={14} />
             <span>设置</span>

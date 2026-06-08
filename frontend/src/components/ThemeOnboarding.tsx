@@ -87,7 +87,7 @@ export const ThemeOnboarding: React.FC = () => {
             <span className="text-sm font-semibold text-theme-text">推荐主题</span>
             <span className="text-[10px] text-theme-text-muted">Recommended</span>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {recommendedThemes.map((theme) => (
               <ThemeOption
                 key={theme.id}

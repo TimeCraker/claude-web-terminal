@@ -19,11 +19,8 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
   const [copyButtonPosition, setCopyButtonPosition] = useState({ x: 0, y: 0 });
   const [showPasteButton, setShowPasteButton] = useState(false);
   const [copiedText, setCopiedText] = useState('');
-  const [showSearch, setShowSearch] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const { switchTerminal, search, searchPrevious, clearSearch } = useTerminal({ sendMessage });
+  const { switchTerminal } = useTerminal({ sendMessage });
   const { activeResourceId, activeWorkspaceId } = useSessionStore();
 
   // 挂载/切换终端
@@ -40,17 +37,14 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
       if (detail.resourceId === activeResourceId) {
         setSelectedText(detail.text);
         if (detail.text) {
-          // 获取选中位置，显示复制按钮
-          const container = containerRef.current;
-          if (container) {
-            const rect = container.getBoundingClientRect();
-            // 简单定位到容器中心
-            setCopyButtonPosition({
-              x: rect.width / 2,
-              y: 20,
-            });
-            setShowCopyButton(true);
-          }
+          // 使用全局鼠标位置（相对于视口）
+          const mouseX = detail.mouseX ?? window.innerWidth / 2;
+          const mouseY = detail.mouseY ?? 100;
+          setCopyButtonPosition({
+            x: Math.max(80, Math.min(mouseX, window.innerWidth - 80)),
+            y: Math.max(50, mouseY - 10),
+          });
+          setShowCopyButton(true);
         } else {
           setShowCopyButton(false);
         }
@@ -79,6 +73,33 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
     const interval = setInterval(checkClipboard, 1000);
     return () => clearInterval(interval);
   }, [copiedText]);
+
+  // 移动端：输入框聚焦时自动滚动到可视区域
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+
+    const handleFocus = () => {
+      // 通知其他组件输入框已聚焦
+      window.dispatchEvent(new CustomEvent('terminal:input-focus', { detail: true }));
+      // 延迟滚动，等待虚拟键盘弹出
+      setTimeout(() => {
+        input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 300);
+    };
+
+    const handleBlur = () => {
+      // 通知其他组件输入框已失焦
+      window.dispatchEvent(new CustomEvent('terminal:input-focus', { detail: false }));
+    };
+
+    input.addEventListener('focus', handleFocus);
+    input.addEventListener('blur', handleBlur);
+    return () => {
+      input.removeEventListener('focus', handleFocus);
+      input.removeEventListener('blur', handleBlur);
+    };
+  }, []);
 
   // 自适应输入框高度
   const autoGrow = useCallback((el: HTMLTextAreaElement | null) => {
@@ -179,23 +200,12 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
       }
       if (e.key === 'Escape') {
         e.preventDefault();
-        if (showSearch) {
-          setShowSearch(false);
-          clearSearch();
-        } else {
-          sendRaw('\x1b');
-        }
+        sendRaw('\x1b');
         return;
       }
       if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
         e.preventDefault();
         sendRaw('\x03');
-        return;
-      }
-      if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
-        e.preventDefault();
-        setShowSearch(true);
-        setTimeout(() => searchInputRef.current?.focus(), 100);
         return;
       }
       if (e.key === 'ArrowUp' && inputValue.length === 0) {
@@ -207,7 +217,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
         sendRaw('\x1b[B');
       }
     },
-    [handleSubmit, sendRaw, inputValue, showSearch, clearSearch]
+    [handleSubmit, sendRaw, inputValue]
   );
 
   // Action bar 按钮
@@ -248,34 +258,6 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
     }
   }, [copiedText]);
 
-  // 搜索功能
-  const handleSearch = useCallback((query: string) => {
-    setSearchQuery(query);
-    if (query) {
-      search(query);
-    } else {
-      clearSearch();
-    }
-  }, [search, clearSearch]);
-
-  const handleSearchNext = useCallback(() => {
-    if (searchQuery) {
-      search(searchQuery);
-    }
-  }, [searchQuery, search]);
-
-  const handleSearchPrevious = useCallback(() => {
-    if (searchQuery) {
-      searchPrevious(searchQuery);
-    }
-  }, [searchQuery, searchPrevious]);
-
-  const handleSearchClose = useCallback(() => {
-    setShowSearch(false);
-    setSearchQuery('');
-    clearSearch();
-  }, [clearSearch]);
-
   // 中文快捷按钮处理
   const handleQuickAction = useCallback((action: string) => {
     switch (action) {
@@ -309,58 +291,9 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
 
   return (
     <div className="flex-1 flex flex-col bg-theme-bg min-h-0 overflow-hidden">
-      {/* 搜索栏 */}
-      {showSearch && (
-        <div className="flex-shrink-0 px-3 py-2 bg-theme-surface border-b border-theme-border">
-          <div className="flex items-center gap-2">
-            <Icon name="search" size={16} className="text-theme-text-muted flex-shrink-0" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.shiftKey ? handleSearchPrevious() : handleSearchNext();
-                }
-                if (e.key === 'Escape') {
-                  handleSearchClose();
-                }
-              }}
-              placeholder="搜索终端内容..."
-              className="flex-1 bg-transparent text-theme-text placeholder-theme-text-muted text-sm focus:outline-none"
-              autoFocus
-            />
-            <div className="flex items-center gap-1">
-              <button
-                onClick={handleSearchPrevious}
-                className="p-1.5 rounded-md hover:bg-theme-surface-light text-theme-text-muted hover:text-theme-text transition-all"
-                title="上一个 (Shift+Enter)"
-              >
-                <Icon name="chevron-up" size={14} />
-              </button>
-              <button
-                onClick={handleSearchNext}
-                className="p-1.5 rounded-md hover:bg-theme-surface-light text-theme-text-muted hover:text-theme-text transition-all"
-                title="下一个 (Enter)"
-              >
-                <Icon name="chevron-down" size={14} />
-              </button>
-              <button
-                onClick={handleSearchClose}
-                className="p-1.5 rounded-md hover:bg-theme-surface-light text-theme-text-muted hover:text-theme-text transition-all"
-                title="关闭 (Esc)"
-              >
-                <Icon name="x" size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 终端渲染区域 */}
       <div
-        className="flex-1 min-h-0 overflow-hidden relative cursor-text"
+        className="flex-1 min-h-0 relative cursor-text"
         onClick={(e) => {
           // 移动端：点击终端区域时聚焦到输入框
           if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.xterm')) {
@@ -375,34 +308,42 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           style={{
             background: 'var(--theme-bg)',
             boxShadow: 'inset 0 0 30px rgba(255,255,255,0.02), 0 0 0 1px var(--theme-border)',
-            // 移动端：允许触摸滚动
-            touchAction: 'pan-x pan-y',
           }}
         />
-
-        {/* 复制按钮 - 选中文本时显示 */}
-        {showCopyButton && selectedText && (
-          <div
-            className="absolute z-50 animate-fade-in"
-            style={{
-              left: `${copyButtonPosition.x}px`,
-              top: `${copyButtonPosition.y}px`,
-              transform: 'translateX(-50%)',
-            }}
-          >
-            <button
-              onClick={handleCopy}
-              className="flex items-center gap-2 px-3 py-2 bg-theme-accent text-theme-bg rounded-lg text-xs font-semibold shadow-lg hover:shadow-xl hover:scale-105 transition-all active:scale-95"
-            >
-              <Icon name="copy" size={14} />
-              <span>复制</span>
-            </button>
-          </div>
-        )}
       </div>
 
+      {/* VS Code 风格浮动工具栏 - 选中文本时显示 */}
+      {showCopyButton && selectedText && (
+        <div
+          className="fixed z-[9999] animate-fade-in pointer-events-auto"
+          style={{
+            left: `${copyButtonPosition.x}px`,
+            top: `${copyButtonPosition.y}px`,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          <div className="flex items-center gap-1 px-2 py-1.5 bg-theme-surface border border-theme-border rounded-lg shadow-xl backdrop-blur-sm">
+            <button
+              onClick={handleCopy}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 bg-theme-accent text-theme-bg rounded-md text-xs font-semibold hover:bg-theme-accent/90 transition-all active:scale-95"
+            >
+              <Icon name="copy" size={12} />
+              <span>复制</span>
+            </button>
+            <button
+              onClick={() => setShowCopyButton(false)}
+              className="flex items-center justify-center w-7 h-7 text-theme-text-muted hover:text-theme-text hover:bg-theme-surface-light rounded-md transition-all"
+            >
+              <Icon name="x" size={12} />
+            </button>
+          </div>
+          {/* 小三角箭头 */}
+          <div className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 bg-theme-surface border-r border-b border-theme-border rotate-45" />
+        </div>
+      )}
+
       {/* 输入框 + Action Bar */}
-      <div className="px-2 sm:px-3 pt-2 pb-2 sm:pb-3 flex-shrink-0 safe-area-pb">
+      <div data-guide="input" className="px-2 sm:px-3 pt-2 pb-2 sm:pb-3 flex-shrink-0 safe-area-pb">
         <div className="relative group">
           <div
             className="absolute -inset-0.5 rounded-xl opacity-0 group-focus-within:opacity-100 transition-opacity duration-300 blur-sm"
@@ -431,7 +372,11 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
               {showPasteButton && copiedText && (
                 <button
                   onClick={handlePaste}
-                  className="flex items-center gap-1 px-2 py-2 bg-theme-accent/10 text-theme-accent rounded-lg text-xs font-medium hover:bg-theme-accent/20 transition-all active:scale-95"
+                  className={`flex items-center gap-1 px-2.5 py-2 border border-theme-border/50 rounded-lg text-xs font-medium transition-all active:scale-95 ${
+                    showPasteButton
+                      ? 'bg-theme-accent/10 text-theme-accent border-theme-accent/40 shadow-[0_0_12px_rgba(var(--theme-accent-rgb),0.3)] animate-paste-glow'
+                      : 'hover:bg-theme-surface-light hover:border-theme-border'
+                  }`}
                   title="粘贴"
                 >
                   <Icon name="clipboard" size={14} />
@@ -441,8 +386,8 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
               <button
                 onClick={handleSubmit}
                 disabled={!inputValue.trim()}
-                className="px-3 py-2 bg-theme-text text-theme-bg rounded-lg text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-theme-glow active:scale-95 transition-all duration-200"
-                style={{ minWidth: '52px', minHeight: '36px' }}
+                className="px-3 py-2.5 sm:py-2 bg-theme-text text-theme-bg rounded-lg text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-theme-glow active:scale-95 transition-all duration-200"
+                style={{ minWidth: '56px', minHeight: '44px' }}
               >
                 Send
               </button>
@@ -451,35 +396,35 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
         </div>
 
         {/* ===== Action Bar ===== */}
-        <div className="flex items-center gap-1.5 mt-2 px-1 overflow-x-auto scrollbar-none">
+        <div data-guide="actionbar" className="flex items-center gap-1.5 sm:gap-1.5 mt-2 px-1 overflow-x-auto scrollbar-none">
 
           {/* Cancel */}
           <button
             onClick={() => { sendRaw('\x03'); inputRef.current?.focus(); }}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-error/80 hover:text-theme-error hover:bg-theme-error/10 border border-transparent hover:border-theme-error/20 transition-all active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1 px-3 py-2 sm:px-2.5 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-mono text-theme-error/80 hover:text-theme-error hover:bg-theme-error/10 border border-transparent hover:border-theme-error/20 transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="Ctrl+C"
           >
-            <Icon name="x" size={10} />
+            <Icon name="x" size={12} className="sm:w-2.5 sm:h-2.5" />
             <span>Cancel</span>
           </button>
 
           {/* Esc */}
           <button
             onClick={() => handleAction('\x1b')}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1 px-3 py-2 sm:px-2.5 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="Esc"
           >
-            <Icon name="chevron-left" size={10} />
+            <Icon name="chevron-left" size={12} className="sm:w-2.5 sm:h-2.5" />
             <span>Esc</span>
           </button>
 
           {/* Tab */}
           <button
             onClick={() => handleAction('\t')}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1 px-3 py-2 sm:px-2.5 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="Tab"
           >
-            <Icon name="chevron-right" size={10} />
+            <Icon name="chevron-right" size={12} className="sm:w-2.5 sm:h-2.5" />
             <span>Tab</span>
           </button>
 
@@ -496,23 +441,10 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
               sendRaw('\r');
               inputRef.current?.focus();
             }}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 flex items-center gap-1 px-3 py-2 sm:px-2.5 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="Shift+Enter: newline"
           >
             <span>↵ Newline</span>
-          </button>
-
-          {/* 搜索按钮 */}
-          <button
-            onClick={() => {
-              setShowSearch(true);
-              setTimeout(() => searchInputRef.current?.focus(), 100);
-            }}
-            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
-            title="Ctrl+F: 搜索"
-          >
-            <Icon name="search" size={10} />
-            <span>搜索</span>
           </button>
 
           {/* 分隔 */}
@@ -521,7 +453,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           {/* 切换模式（= Shift+Tab） */}
           <button
             onClick={() => { sendRaw('\x1b[Z'); inputRef.current?.focus(); }}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-semibold font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-semibold font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="Shift+Tab: switch mode"
           >
             切换模式
@@ -534,7 +466,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           <button
             onClick={() => handleAction('\x1b[A')}
             disabled={inputValue.length > 0}
-            className="flex-shrink-0 w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-xs font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-sm sm:text-xs font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
             title="Previous history"
           >
             ↑
@@ -542,7 +474,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           <button
             onClick={() => handleAction('\x1b[B')}
             disabled={inputValue.length > 0}
-            className="flex-shrink-0 w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-xs font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
+            className="flex-shrink-0 w-11 h-11 sm:w-7 sm:h-7 flex items-center justify-center rounded-lg text-sm sm:text-xs font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 disabled:opacity-20 disabled:cursor-not-allowed"
             title="Next history"
           >
             ↓
@@ -550,38 +482,38 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
         </div>
 
         {/* ===== 中文快捷按钮 ===== */}
-        <div className="flex items-center gap-1.5 mt-2 px-1 overflow-x-auto scrollbar-none">
+        <div data-guide="quickactions" className="flex items-center gap-1.5 sm:gap-1.5 mt-2 px-1 overflow-x-auto scrollbar-none">
           <button
             onClick={() => handleQuickAction('clear')}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-medium text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-medium text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="清屏 (Ctrl+L)"
           >
             清屏
           </button>
           <button
             onClick={() => handleQuickAction('interrupt')}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-medium text-theme-error/80 hover:text-theme-error hover:bg-theme-error/10 border border-transparent hover:border-theme-error/20 transition-all active:scale-95"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-medium text-theme-error/80 hover:text-theme-error hover:bg-theme-error/10 border border-transparent hover:border-theme-error/20 transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="中断 (Ctrl+C)"
           >
             中断
           </button>
           <button
             onClick={() => handleQuickAction('exit')}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-medium text-theme-warning/80 hover:text-theme-warning hover:bg-theme-warning/10 border border-transparent hover:border-theme-warning/20 transition-all active:scale-95"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-medium text-theme-warning/80 hover:text-theme-warning hover:bg-theme-warning/10 border border-transparent hover:border-theme-warning/20 transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="退出 (Ctrl+D)"
           >
             退出
           </button>
           <button
             onClick={() => handleQuickAction('help')}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-medium text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-medium text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="显示帮助"
           >
             帮助
           </button>
           <button
             onClick={() => handleQuickAction('history')}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-medium text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-medium text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 min-h-[44px] sm:min-h-0"
             title="查看历史命令"
           >
             历史
@@ -592,24 +524,24 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
 
           <button
             onClick={() => handleQuickAction('ls')}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95"
-            title="列出文件"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95 min-h-[44px] sm:min-h-0"
+            title="列出当前目录下的文件"
           >
-            ls
+            ls <span className="text-theme-text-muted text-[9px] sm:text-[8px]">列文件</span>
           </button>
           <button
             onClick={() => handleQuickAction('pwd')}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95"
-            title="显示当前路径"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95 min-h-[44px] sm:min-h-0"
+            title="显示当前工作目录的完整路径"
           >
-            pwd
+            pwd <span className="text-theme-text-muted text-[9px] sm:text-[8px]">当前路径</span>
           </button>
           <button
             onClick={() => handleQuickAction('cd')}
-            className="flex-shrink-0 px-3 py-1.5 sm:py-1 rounded-lg text-[10px] font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95"
-            title="切换到主目录"
+            className="flex-shrink-0 px-3 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-mono text-theme-accent/80 hover:text-theme-accent bg-theme-accent/5 hover:bg-theme-accent/10 border border-theme-accent/20 hover:border-theme-accent/40 transition-all active:scale-95 min-h-[44px] sm:min-h-0"
+            title="切换到用户主目录"
           >
-            cd ~
+            cd~ <span className="text-theme-text-muted text-[9px] sm:text-[8px]">回主目录</span>
           </button>
         </div>
       </div>

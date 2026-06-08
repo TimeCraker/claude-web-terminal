@@ -34,13 +34,13 @@ export const VirtualKeyboard: React.FC<VirtualKeyboardProps> = ({
   ];
 
   return (
-    <div className="px-3 pb-3 bg-[#1C1D22]">
-      <div className="flex flex-wrap gap-1.5 justify-center p-2.5 bg-[#25262C] rounded-xl border border-neutral-800/60">
+    <div className="px-3 pb-3 bg-theme-bg">
+      <div className="flex flex-wrap gap-1.5 justify-center p-2.5 bg-theme-surface rounded-xl border border-theme-border/60">
         {keys.map((k) => (
           <button
             key={k.label}
             onClick={() => sendKey(k.key)}
-            className={`px-3.5 py-2 bg-[#25262C] hover:bg-[#2D2E36] rounded-xl text-xs font-mono text-neutral-400 hover:text-neutral-300 transition-all duration-200 border border-neutral-800/40 hover:border-neutral-700/50 active:scale-95 ${
+            className={`px-3.5 py-2.5 sm:py-2 bg-theme-surface-light hover:bg-theme-surface-elevated rounded-xl text-xs font-mono text-theme-text-secondary hover:text-theme-text transition-all duration-200 border border-theme-border/40 hover:border-theme-border-strong active:scale-95 min-h-[44px] ${
               k.wide ? 'flex-1 max-w-[140px]' : ''
             }`}
           >

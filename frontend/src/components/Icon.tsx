@@ -273,6 +273,13 @@ export const Icon: React.FC<IconProps> = ({ name, className = '', size = 16 }) =
         </svg>
       );
 
+    case 'check':
+      return (
+        <svg {...props}>
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      );
+
     default:
       // 默认文件夹图标
       return (

@@ -6,6 +6,8 @@ import { SettingsPanel } from './components/SettingsPanel';
 import { TopBar } from './components/TopBar';
 import { ThemeOnboarding } from './components/ThemeOnboarding';
 import { AuthGate } from './components/AuthGate';
+import { FeatureOnboarding } from './components/FeatureOnboarding';
+import { GuideConfirmDialog } from './components/GuideConfirmDialog';
 import { Icon } from './components/Icon';
 import { BrandLogo } from './components/BrandLogo';
 import { useWebSocket } from './hooks/useWebSocket';
@@ -213,6 +215,19 @@ const App: React.FC = () => {
 
         {/* 首次访问主题引导 */}
         <ThemeOnboarding />
+
+        {/* 功能引导确认对话框 */}
+        <GuideConfirmDialog
+          onConfirm={() => {
+            window.dispatchEvent(new CustomEvent('guide:start'));
+          }}
+          onSkip={() => {
+            // 用户跳过引导，不做任何操作
+          }}
+        />
+
+        {/* 功能引导 */}
+        <FeatureOnboarding />
       </div>
     </AuthGate>
   );

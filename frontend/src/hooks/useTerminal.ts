@@ -7,6 +7,7 @@ import { useSessionStore } from '../store/sessionStore';
 import { useThemeStore } from '../themes/useThemeStore';
 import { ClientMessage, ServerMessage, TerminalSnapshot } from '../types';
 import { wsSessionId } from './useWebSocket';
+import { getTerminalFontSize } from './useViewport';
 
 function getTheme() {
   return useThemeStore.getState().getTheme().xterm;
@@ -33,6 +34,12 @@ interface TerminalInstance {
   writeBuffer: string;
   /** rAF ID，非 0 表示有待刷新的写入 */
   writeRafId: number;
+  /** 触摸事件处理器（用于清理） */
+  touchHandlers: {
+    start: (e: TouchEvent) => void;
+    move: (e: TouchEvent) => void;
+    end: () => void;
+  } | null;
 }
 
 const terminalPool = new Map<string, TerminalInstance>();
@@ -151,7 +158,7 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       const terminal = new Terminal({
         theme: getTheme(),
         fontFamily: getFontFamily(),
-        fontSize: 14,
+        fontSize: getTerminalFontSize(window.innerWidth),
         lineHeight: 1.0,
         letterSpacing: 0,
         cursorBlink: false,
@@ -175,24 +182,68 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
         console.warn('WebGL not available, falling back to canvas renderer');
       }
 
+      // 监听鼠标位置用于浮动工具栏定位（使用全局坐标）
+      let lastMouseX = 0;
+      let lastMouseY = 0;
+      const handleMouseMove = (e: MouseEvent) => {
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+      };
+      container.addEventListener('mousemove', handleMouseMove);
+
       // 监听选中文本变化
       terminal.onSelectionChange(() => {
         const selection = terminal.getSelection();
-        if (selection) {
-          window.dispatchEvent(new CustomEvent('terminal:selection', {
-            detail: { text: selection, resourceId }
-          }));
-        } else {
-          window.dispatchEvent(new CustomEvent('terminal:selection', {
-            detail: { text: '', resourceId }
-          }));
-        }
+        window.dispatchEvent(new CustomEvent('terminal:selection', {
+          detail: {
+            text: selection || '',
+            resourceId,
+            mouseX: lastMouseX,
+            mouseY: lastMouseY,
+          }
+        }));
       });
 
       const wrapper = document.createElement('div');
       wrapper.className = 'terminal-wrapper';
       container.appendChild(wrapper);
       terminal.open(wrapper);
+
+      // 移动端触摸滚动支持
+      let touchStartY = 0;
+      let touchStartScrollTop = 0;
+      let isTouching = false;
+
+      const handleTouchStart = (e: TouchEvent) => {
+        if (e.touches.length !== 1) return;
+        touchStartY = e.touches[0].clientY;
+        const viewport = terminal.element?.querySelector('.xterm-viewport');
+        if (viewport) {
+          touchStartScrollTop = viewport.scrollTop;
+        }
+        isTouching = true;
+      };
+
+      const handleTouchMove = (e: TouchEvent) => {
+        if (!isTouching || e.touches.length !== 1) return;
+        e.preventDefault();
+
+        const touchCurrentY = e.touches[0].clientY;
+        const deltaY = touchStartY - touchCurrentY;
+
+        const viewport = terminal.element?.querySelector('.xterm-viewport');
+        if (viewport) {
+          viewport.scrollTop = touchStartScrollTop + deltaY;
+        }
+      };
+
+      const handleTouchEnd = () => {
+        isTouching = false;
+      };
+
+      container.addEventListener('touchstart', handleTouchStart, { passive: true });
+      container.addEventListener('touchmove', handleTouchMove, { passive: false });
+      container.addEventListener('touchend', handleTouchEnd, { passive: true });
 
       const instance: TerminalInstance = {
         terminal,
@@ -209,6 +260,11 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
         subscribedWsSession: 0,
         writeBuffer: '',
         writeRafId: 0,
+        touchHandlers: {
+          start: handleTouchStart,
+          move: handleTouchMove,
+          end: handleTouchEnd,
+        },
       };
 
       const resizeObserver = new ResizeObserver(() => scheduleResize(instance));
@@ -303,6 +359,12 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       if (instance.writeRafId !== 0) {
         cancelAnimationFrame(instance.writeRafId);
       }
+      // 清理触摸事件监听器
+      if (instance.touchHandlers) {
+        instance.container.removeEventListener('touchstart', instance.touchHandlers.start);
+        instance.container.removeEventListener('touchmove', instance.touchHandlers.move);
+        instance.container.removeEventListener('touchend', instance.touchHandlers.end);
+      }
       instance.resizeObserver.disconnect();
       instance.terminal.dispose();
       instance.wrapper.remove();
@@ -331,6 +393,21 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       instance.terminal.options.fontFamily = fontFamily;
     });
   }, [themeId, fontId]);
+
+  // ==================== 字体大小自适应 ====================
+  useEffect(() => {
+    const handleResize = () => {
+      const fontSize = getTerminalFontSize(window.innerWidth);
+      terminalPool.forEach((instance) => {
+        if (instance.terminal.options.fontSize !== fontSize) {
+          instance.terminal.options.fontSize = fontSize;
+        }
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => {
     currentWsSession = wsSessionId;
@@ -383,38 +460,10 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
     return () => window.removeEventListener('ws:resource', handleResourceEvent);
   }, [writeToTerminal, restoreSnapshot, disposeTerminal]);
 
-  // 搜索功能
-  const search = useCallback((term: string) => {
-    if (!activeResourceId) return;
-    const instance = terminalPool.get(activeResourceId);
-    if (instance) {
-      instance.searchAddon.findNext(term);
-    }
-  }, [activeResourceId]);
-
-  const searchPrevious = useCallback((term: string) => {
-    if (!activeResourceId) return;
-    const instance = terminalPool.get(activeResourceId);
-    if (instance) {
-      instance.searchAddon.findPrevious(term);
-    }
-  }, [activeResourceId]);
-
-  const clearSearch = useCallback(() => {
-    if (!activeResourceId) return;
-    const instance = terminalPool.get(activeResourceId);
-    if (instance) {
-      instance.searchAddon.clearDecorations();
-    }
-  }, [activeResourceId]);
-
   return {
     switchTerminal,
     writeToTerminal,
     disposeTerminal,
     fitTerminal,
-    search,
-    searchPrevious,
-    clearSearch,
   };
 }

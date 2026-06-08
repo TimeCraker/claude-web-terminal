@@ -21,6 +21,7 @@ export const StatusBar: React.FC = () => {
   } | null>(null);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
   // 监听重连事件
   useEffect(() => {
@@ -40,14 +41,22 @@ export const StatusBar: React.FC = () => {
       setTimeout(() => setErrorMessage(null), 5000);
     };
 
+    // 监听输入框聚焦事件（移动端隐藏状态栏）
+    const handleInputFocus = (event: Event) => {
+      const focused = (event as CustomEvent).detail;
+      setIsInputFocused(focused);
+    };
+
     window.addEventListener('ws:reconnecting', handleReconnecting);
     window.addEventListener('ws:connected', handleConnected);
     window.addEventListener('ws:error', handleError);
+    window.addEventListener('terminal:input-focus', handleInputFocus);
 
     return () => {
       window.removeEventListener('ws:reconnecting', handleReconnecting);
       window.removeEventListener('ws:connected', handleConnected);
       window.removeEventListener('ws:error', handleError);
+      window.removeEventListener('terminal:input-focus', handleInputFocus);
     };
   }, []);
 
@@ -117,8 +126,13 @@ export const StatusBar: React.FC = () => {
 
   const connectionStatus = getConnectionStatus();
 
+  // 移动端：输入框聚焦时隐藏状态栏
+  if (isInputFocused && window.innerWidth < 640) {
+    return null;
+  }
+
   return (
-    <div className="h-9 bg-theme-surface border-t border-theme-border flex items-center px-3 sm:px-4 text-xs overflow-hidden">
+    <div className="h-9 bg-theme-surface border-t border-theme-border flex items-center px-3 sm:px-4 text-xs overflow-hidden transition-all duration-300">
       {/* Left side */}
       <div className="flex items-center gap-3 sm:gap-4 min-w-0">
         <div className="flex items-center gap-2 flex-shrink-0">
