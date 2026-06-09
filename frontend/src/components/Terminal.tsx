@@ -407,27 +407,28 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
 
         {/* 置顶/置底浮动按钮 */}
         <div
-          className={`absolute right-3 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 transition-all duration-300 ${
-            showScrollBtns ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'
+          className={`absolute right-2.5 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-1.5 transition-all duration-300 ease-out ${
+            showScrollBtns ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'
           }`}
         >
           {/* 置顶按钮 */}
           {!isAtTop && (
             <button
               onClick={(e) => { e.stopPropagation(); scrollToTop(); }}
-              className="group/btn w-8 h-8 flex items-center justify-center rounded-lg
-                bg-theme-surface/80 border border-theme-border/50 backdrop-blur-sm
-                text-theme-text-muted hover:text-theme-accent hover:border-theme-accent/40 hover:bg-theme-surface
-                hover:shadow-[0_0_12px_rgba(83,216,251,0.15)]
-                active:scale-90 active:shadow-[0_0_20px_rgba(83,216,251,0.3)]
+              className="group/btn w-9 h-9 flex items-center justify-center rounded-full
+                bg-theme-surface-light/60 backdrop-blur-md
+                text-theme-text-muted
+                hover:text-theme-accent hover:bg-theme-surface-light
+                hover:shadow-[0_0_16px_rgba(83,216,251,0.2),0_2px_8px_rgba(0,0,0,0.3)]
+                active:scale-[0.85]
                 transition-all duration-200 ease-out"
-              title="Scroll to top"
+              title="回到顶部"
             >
               <svg
-                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                className="transition-transform duration-200 group-hover/btn:-translate-y-0.5"
+                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                className="transition-transform duration-200 group-hover/btn:-translate-y-0.5 group-hover/btn:scale-110"
               >
-                <path d="M12 19V5M5 12l7-7 7 7" />
+                <polyline points="18 15 12 9 6 15" />
               </svg>
             </button>
           )}
@@ -436,19 +437,20 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           {!isAtBottom && (
             <button
               onClick={(e) => { e.stopPropagation(); scrollToBottom(); }}
-              className="group/btn w-8 h-8 flex items-center justify-center rounded-lg
-                bg-theme-surface/80 border border-theme-border/50 backdrop-blur-sm
-                text-theme-text-muted hover:text-theme-accent hover:border-theme-accent/40 hover:bg-theme-surface
-                hover:shadow-[0_0_12px_rgba(83,216,251,0.15)]
-                active:scale-90 active:shadow-[0_0_20px_rgba(83,216,251,0.3)]
+              className="group/btn w-9 h-9 flex items-center justify-center rounded-full
+                bg-theme-surface-light/60 backdrop-blur-md
+                text-theme-text-muted
+                hover:text-theme-accent hover:bg-theme-surface-light
+                hover:shadow-[0_0_16px_rgba(83,216,251,0.2),0_2px_8px_rgba(0,0,0,0.3)]
+                active:scale-[0.85]
                 transition-all duration-200 ease-out"
-              title="Scroll to bottom"
+              title="回到底部"
             >
               <svg
-                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                className="transition-transform duration-200 group-hover/btn:translate-y-0.5"
+                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                className="transition-transform duration-200 group-hover/btn:translate-y-0.5 group-hover/btn:scale-110"
               >
-                <path d="M12 5v14M5 12l7 7 7-7" />
+                <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
           )}
