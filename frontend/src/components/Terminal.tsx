@@ -495,8 +495,8 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
             style={{ background: 'linear-gradient(to right, var(--theme-gradient-from), var(--theme-gradient-to))' }}
           />
 
-          <div className="relative flex items-end gap-2 bg-theme-surface-light rounded-xl border border-theme-border group-focus-within:border-transparent transition-all duration-300">
-            <div className="pl-4 pb-3 text-theme-text-muted font-mono text-sm select-none">{'❯'}</div>
+          <div className="relative flex items-center gap-2 bg-theme-surface-light rounded-xl border border-theme-border group-focus-within:border-transparent transition-all duration-300">
+            <div className="pl-4 text-theme-text-muted font-mono text-sm select-none">{'❯'}</div>
             <textarea
               ref={inputRef}
               value={inputValue}
@@ -512,7 +512,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
               className="flex-1 bg-transparent text-theme-text placeholder-theme-text-muted resize-none py-3 pr-2 focus:outline-none font-mono text-base sm:text-sm leading-relaxed"
               style={{ minHeight: '44px', maxHeight: MAX_INPUT_HEIGHT, touchAction: 'manipulation' }}
             />
-            <div className="flex items-center gap-1 mr-2 mb-2">
+            <div className="flex items-center gap-1 mr-2">
               {/* 粘贴按钮 - 剪贴板有内容时显示 */}
               {showPasteButton && copiedText && (
                 <button
@@ -531,7 +531,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
               <button
                 onClick={handleSubmit}
                 disabled={!inputValue.trim()}
-                className="px-3 py-2.5 sm:py-2 bg-theme-text text-theme-bg rounded-lg text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-theme-glow active:scale-95 transition-all duration-200"
+                className="px-3 py-2.5 sm:py-2 bg-theme-text text-theme-bg rounded-lg text-xs font-semibold disabled:opacity-30 disabled:cursor-not-allowed hover:shadow-theme-glow active:scale-95 transition-all duration-200 my-auto"
                 style={{ minWidth: '56px', minHeight: '44px' }}
               >
                 Send
