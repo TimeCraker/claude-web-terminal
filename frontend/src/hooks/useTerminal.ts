@@ -98,7 +98,7 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
         if (safeFit(instance)) {
           flushResize(instance);
         }
-      }, 150);
+      }, 50);
     },
     [safeFit, flushResize]
   );
@@ -272,7 +272,15 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       instance.resizeObserver = resizeObserver;
 
       terminalPool.set(resourceId, instance);
-      requestAnimationFrame(() => safeFit(instance));
+      requestAnimationFrame(() => {
+        safeFit(instance);
+        // 延迟二次 fit：新终端首次挂载后，flex 布局可能需要额外 reflow
+        setTimeout(() => {
+          if (safeFit(instance)) {
+            flushResize(instance);
+          }
+        }, 100);
+      });
 
       return instance;
     },
@@ -302,6 +310,13 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
         try {
           instance.terminal.focus();
         } catch {}
+
+        // 延迟二次 fit：确保 flex 布局 reflow 完成后重新计算
+        setTimeout(() => {
+          if (safeFit(instance)) {
+            flushResize(instance);
+          }
+        }, 100);
       });
     },
     [activeResourceId, activeWorkspaceId, ensureTerminal, safeFit, subscribeWhenReady, flushResize]

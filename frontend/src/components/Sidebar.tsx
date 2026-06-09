@@ -161,7 +161,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <aside
         data-guide="sidebar"
         className={`fixed lg:static inset-y-0 left-0 z-50 w-[85vw] sm:w-72 max-w-[320px] lg:max-w-none
-          bg-theme-surface border-r border-theme-border flex flex-col h-full
+          bg-theme-surface border-r border-theme-border flex flex-col h-[100dvh] lg:h-full
           transition-all duration-300 ease-in-out overflow-hidden
           ${isOpen ? 'opacity-100' : 'w-0 opacity-0 lg:w-0 lg:opacity-0 pointer-events-none lg:pointer-events-auto'}`}
         style={{

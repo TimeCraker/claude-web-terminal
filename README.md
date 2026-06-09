@@ -247,6 +247,114 @@ curl http://localhost:3100/health
 # -> {"status":"ok","timestamp":...}
 ```
 
+## 运维指南
+
+### 更换 API Key（小米 MiMo）
+
+本项目使用小米 MiMo API 作为 Claude Code 的后端。更换 API Key 需要修改**3 个位置**：
+
+#### 1. Vision Proxy 配置
+
+```bash
+# 编辑 Vision Proxy 配置
+vim /opt/vision-proxy/config.json
+
+# 修改以下两个字段：
+{
+  "anthropicApiKey": "新的API_KEY",
+  "visionApiKey": "新的API_KEY"
+}
+
+# 重启 Vision Proxy
+sudo kill $(sudo lsof -t -i:15722)
+cd /opt/vision-proxy && nohup node server.mjs > /tmp/vision-proxy.log 2>&1 &
+```
+
+#### 2. Claude Remote Bot 环境变量
+
+```bash
+# 编辑环境变量文件
+vim /opt/claude-remote-bot/.env
+
+# 修改：
+MIMO_API_KEY=新的API_KEY
+
+# 重启服务
+sudo systemctl restart claude-remote-bot
+```
+
+#### 3. Claude Code 全局设置 ⚠️ 最容易遗漏
+
+```bash
+# 编辑 Claude Code 设置
+vim ~/.claude/settings.json
+
+# 修改 env.ANTHROPIC_AUTH_TOKEN：
+{
+  "env": {
+    "ANTHROPIC_AUTH_TOKEN": "新的API_KEY",
+    ...
+  }
+}
+```
+
+#### 4. 重启 Claude Web Terminal
+
+```bash
+# 重启后端服务
+cd /home/ubuntu/claude-web-terminal
+sudo kill $(sudo lsof -t -i:3100)
+bash restart.sh
+```
+
+#### 验证
+
+```bash
+# 检查 Vision Proxy
+curl http://localhost:15722/health
+
+# 检查 Claude Web Terminal
+curl http://localhost:3100/health
+
+# 测试 API 调用
+curl -s -X POST http://127.0.0.1:15722/v1/messages \
+  -H 'Content-Type: application/json' \
+  -H 'x-api-key: 新的API_KEY' \
+  -H 'anthropic-version: 2023-06-01' \
+  -d '{"model":"mimo-v2.5-pro","max_tokens":100,"messages":[{"role":"user","content":"Hi"}]}'
+```
+
+#### 配置文件位置速查
+
+| 文件 | 作用 | 包含的 Key |
+|------|------|-----------|
+| `/opt/vision-proxy/config.json` | Vision Proxy 代理配置 | `anthropicApiKey`, `visionApiKey` |
+| `/opt/claude-remote-bot/.env` | 飞书 Bot 环境变量 | `MIMO_API_KEY` |
+| `~/.claude/settings.json` | Claude Code 全局设置 | `env.ANTHROPIC_AUTH_TOKEN` |
+
+> ⚠️ **注意**：`~/.claude/settings.json` 里的 `ANTHROPIC_AUTH_TOKEN` 会**覆盖环境变量**，这是最常见的遗漏点！
+
+### 服务端口
+
+| 端口 | 服务 | 说明 |
+|------|------|------|
+| 3100 | Claude Web Terminal | Web 终端后端 |
+| 15722 | Vision Proxy | API 代理（转发到小米 MiMo） |
+| 80 | Nginx | 反向代理 + 静态文件 |
+
+### 日志位置
+
+```bash
+# Claude Web Terminal
+tail -f /tmp/workspace-backend.log
+
+# Vision Proxy
+tail -f /tmp/vision-proxy.log
+
+# Claude Remote Bot (飞书)
+sudo journalctl -u claude-remote-bot -f
+```
+
 ## 设计系统
 
 ### 主题系统 (v1.0.1)

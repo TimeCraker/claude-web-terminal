@@ -241,6 +241,16 @@ html.theme-transitioning *::after {
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* xterm 触摸优化 - 禁止浏览器默认触摸，由 JS 转发滚动给 xterm */
+  .xterm-screen {
+    touch-action: none;
+  }
+
+  .xterm-viewport {
+    touch-action: none;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 /* ============================================================

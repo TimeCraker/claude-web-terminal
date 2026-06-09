@@ -19,6 +19,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
   const [copyButtonPosition, setCopyButtonPosition] = useState({ x: 0, y: 0 });
   const [showPasteButton, setShowPasteButton] = useState(false);
   const [copiedText, setCopiedText] = useState('');
+  const touchStartRef = useRef<{ y: number; time: number } | null>(null);
 
   const { switchTerminal } = useTerminal({ sendMessage });
   const { activeResourceId, activeWorkspaceId } = useSessionStore();
@@ -289,6 +290,31 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
     inputRef.current?.focus();
   }, [sendRaw, sendText]);
 
+  // ==================== 移动端触摸滚动转发 ====================
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStartRef.current = {
+      y: e.touches[0].clientY,
+      time: Date.now(),
+    };
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current || !containerRef.current) return;
+    const currentY = e.touches[0].clientY;
+    const deltaY = touchStartRef.current.y - currentY;
+    touchStartRef.current.y = currentY;
+
+    // 将触摸滚动转发为 wheel 事件给 xterm
+    const viewport = containerRef.current.querySelector('.xterm-viewport') as HTMLElement | null;
+    if (viewport) {
+      viewport.scrollTop += deltaY;
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    touchStartRef.current = null;
+  }, []);
+
   return (
     <div className="flex-1 flex flex-col bg-theme-bg min-h-0 overflow-hidden">
       {/* 终端渲染区域 */}
@@ -308,7 +334,12 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           style={{
             background: 'var(--theme-bg)',
             boxShadow: 'inset 0 0 30px rgba(255,255,255,0.02), 0 0 0 1px var(--theme-border)',
+            // 移动端：禁止浏览器默认触摸处理，由 JS 转发给 xterm
+            touchAction: 'none',
           }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         />
       </div>
 
