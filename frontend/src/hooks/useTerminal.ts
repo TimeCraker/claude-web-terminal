@@ -211,18 +211,25 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
       container.appendChild(wrapper);
       terminal.open(wrapper);
 
-      // 移动端触摸滚动支持
-      let touchStartY = 0;
-      let touchStartScrollTop = 0;
+      // 移动端触摸滚动支持（增量跟踪 + 惯性）
+      let prevY = 0;
+      let velocity = 0;
+      let lastMoveTime = 0;
       let isTouching = false;
+      let inertiaRafId = 0;
+
+      const getViewport = () => terminal.element?.querySelector('.xterm-viewport') as HTMLElement | null;
 
       const handleTouchStart = (e: TouchEvent) => {
         if (e.touches.length !== 1) return;
-        touchStartY = e.touches[0].clientY;
-        const viewport = terminal.element?.querySelector('.xterm-viewport');
-        if (viewport) {
-          touchStartScrollTop = viewport.scrollTop;
+        // 停止正在进行的惯性滚动
+        if (inertiaRafId) {
+          cancelAnimationFrame(inertiaRafId);
+          inertiaRafId = 0;
         }
+        prevY = e.touches[0].clientY;
+        velocity = 0;
+        lastMoveTime = Date.now();
         isTouching = true;
       };
 
@@ -230,17 +237,45 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
         if (!isTouching || e.touches.length !== 1) return;
         e.preventDefault();
 
-        const touchCurrentY = e.touches[0].clientY;
-        const deltaY = touchStartY - touchCurrentY;
+        const curY = e.touches[0].clientY;
+        const delta = prevY - curY; // 正值=手指上滑=内容上滚
+        const now = Date.now();
+        const dt = now - lastMoveTime;
 
-        const viewport = terminal.element?.querySelector('.xterm-viewport');
-        if (viewport) {
-          viewport.scrollTop = touchStartScrollTop + deltaY;
+        // 计算瞬时速度（px/ms）
+        if (dt > 0) {
+          velocity = delta / dt;
         }
+
+        const viewport = getViewport();
+        if (viewport) {
+          viewport.scrollTop += delta;
+        }
+
+        prevY = curY;
+        lastMoveTime = now;
       };
 
       const handleTouchEnd = () => {
         isTouching = false;
+
+        // 惯性滚动
+        const viewport = getViewport();
+        if (!viewport || Math.abs(velocity) < 0.1) return;
+
+        let v = velocity * 16; // 转换为 px/帧（约 60fps）
+        const friction = 0.95; // 摩擦系数，越小停得越快
+
+        const step = () => {
+          v *= friction;
+          if (Math.abs(v) < 0.5) {
+            inertiaRafId = 0;
+            return;
+          }
+          viewport.scrollTop += v;
+          inertiaRafId = requestAnimationFrame(step);
+        };
+        inertiaRafId = requestAnimationFrame(step);
       };
 
       container.addEventListener('touchstart', handleTouchStart, { passive: true });
