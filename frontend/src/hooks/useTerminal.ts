@@ -206,6 +206,8 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
 
       const wrapper = document.createElement('div');
       wrapper.className = 'terminal-wrapper';
+      wrapper.style.height = '100%';
+      wrapper.style.width = '100%';
       container.appendChild(wrapper);
       terminal.open(wrapper);
 
