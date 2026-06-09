@@ -20,6 +20,10 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
   const [showPasteButton, setShowPasteButton] = useState(false);
   const [copiedText, setCopiedText] = useState('');
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
+  const [isAtTop, setIsAtTop] = useState(true);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const scrollBtnHideTimer = useRef<number | null>(null);
+  const [showScrollBtns, setShowScrollBtns] = useState(false);
 
   const { switchTerminal } = useTerminal({ sendMessage });
   const { activeResourceId, activeWorkspaceId } = useSessionStore();
@@ -30,6 +34,38 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
       switchTerminal(containerRef.current);
     }
   }, [activeResourceId, activeWorkspaceId, switchTerminal]);
+
+  // 监听 xterm viewport 滚动位置，更新置顶/置底按钮状态
+  useEffect(() => {
+    if (!containerRef.current || !activeResourceId) return;
+    const viewport = containerRef.current.querySelector('.xterm-viewport') as HTMLElement | null;
+    if (!viewport) {
+      // xterm 可能还没渲染，延迟绑定
+      const timer = setTimeout(() => {
+        const vp = containerRef.current?.querySelector('.xterm-viewport') as HTMLElement | null;
+        if (vp) bindScrollListener(vp);
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+    bindScrollListener(viewport);
+
+    function bindScrollListener(vp: HTMLElement) {
+      const check = () => {
+        const threshold = 30;
+        setIsAtTop(vp.scrollTop <= threshold);
+        setIsAtBottom(vp.scrollTop + vp.clientHeight >= vp.scrollHeight - threshold);
+      };
+      check();
+      vp.addEventListener('scroll', check, { passive: true });
+      // 也监听内容变化（新输出写入时）
+      const observer = new MutationObserver(check);
+      observer.observe(vp, { childList: true, subtree: true });
+      return () => {
+        vp.removeEventListener('scroll', check);
+        observer.disconnect();
+      };
+    }
+  }, [activeResourceId]);
 
   // 监听终端选中事件
   useEffect(() => {
@@ -315,6 +351,31 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
     touchStartRef.current = null;
   }, []);
 
+  // ==================== 置顶/置底滚动 ====================
+  const scrollToTop = useCallback(() => {
+    const viewport = containerRef.current?.querySelector('.xterm-viewport') as HTMLElement | null;
+    if (viewport) {
+      viewport.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const viewport = containerRef.current?.querySelector('.xterm-viewport') as HTMLElement | null;
+    if (viewport) {
+      viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+    }
+  }, []);
+
+  // 鼠标悬浮在终端区域时显示滚动按钮
+  const handleTerminalMouseEnter = useCallback(() => {
+    if (scrollBtnHideTimer.current) clearTimeout(scrollBtnHideTimer.current);
+    setShowScrollBtns(true);
+  }, []);
+
+  const handleTerminalMouseLeave = useCallback(() => {
+    scrollBtnHideTimer.current = window.setTimeout(() => setShowScrollBtns(false), 300);
+  }, []);
+
   return (
     <div className="flex-1 flex flex-col bg-theme-bg min-h-0 overflow-hidden">
       {/* 终端渲染区域 */}
@@ -326,6 +387,8 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
             inputRef.current?.focus();
           }
         }}
+        onMouseEnter={handleTerminalMouseEnter}
+        onMouseLeave={handleTerminalMouseLeave}
       >
         <div
           ref={containerRef}
@@ -341,6 +404,55 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         />
+
+        {/* 置顶/置底浮动按钮 */}
+        <div
+          className={`absolute right-3 top-1/2 -translate-y-1/2 z-10 flex flex-col gap-2 transition-all duration-300 ${
+            showScrollBtns ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-3 pointer-events-none'
+          }`}
+        >
+          {/* 置顶按钮 */}
+          {!isAtTop && (
+            <button
+              onClick={(e) => { e.stopPropagation(); scrollToTop(); }}
+              className="group/btn w-8 h-8 flex items-center justify-center rounded-lg
+                bg-theme-surface/80 border border-theme-border/50 backdrop-blur-sm
+                text-theme-text-muted hover:text-theme-accent hover:border-theme-accent/40 hover:bg-theme-surface
+                hover:shadow-[0_0_12px_rgba(83,216,251,0.15)]
+                active:scale-90 active:shadow-[0_0_20px_rgba(83,216,251,0.3)]
+                transition-all duration-200 ease-out"
+              title="Scroll to top"
+            >
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                className="transition-transform duration-200 group-hover/btn:-translate-y-0.5"
+              >
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+            </button>
+          )}
+
+          {/* 置底按钮 */}
+          {!isAtBottom && (
+            <button
+              onClick={(e) => { e.stopPropagation(); scrollToBottom(); }}
+              className="group/btn w-8 h-8 flex items-center justify-center rounded-lg
+                bg-theme-surface/80 border border-theme-border/50 backdrop-blur-sm
+                text-theme-text-muted hover:text-theme-accent hover:border-theme-accent/40 hover:bg-theme-surface
+                hover:shadow-[0_0_12px_rgba(83,216,251,0.15)]
+                active:scale-90 active:shadow-[0_0_20px_rgba(83,216,251,0.3)]
+                transition-all duration-200 ease-out"
+              title="Scroll to bottom"
+            >
+              <svg
+                width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                className="transition-transform duration-200 group-hover/btn:translate-y-0.5"
+              >
+                <path d="M12 5v14M5 12l7 7 7-7" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* VS Code 风格浮动工具栏 - 选中文本时显示 */}
