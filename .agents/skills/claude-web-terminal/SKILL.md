@@ -7,6 +7,11 @@ description: "Claude Web Terminal (AI Workspace OS) 项目运维 - 部署、状�
 
 Claude Web Terminal（AI Workspace OS）项目运维：部署、状态、重启、日志。Git 是 source of truth。
 
+## 执行协议
+
+1. deploy 前确认本地代码已 commit 且与 origin 一致。
+2. 命令失败时停止，不得宣称完成。用户没明确要求时不主动跑检查命令。
+
 ## 关键信息速查
 
 | 项目 | 值 |
