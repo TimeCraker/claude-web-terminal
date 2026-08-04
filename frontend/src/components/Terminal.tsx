@@ -19,12 +19,15 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
   const [copyButtonPosition, setCopyButtonPosition] = useState({ x: 0, y: 0 });
   const [showPasteButton, setShowPasteButton] = useState(false);
   const [copiedText, setCopiedText] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isAtTop, setIsAtTop] = useState(true);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const scrollBtnHideTimer = useRef<number | null>(null);
   const [showScrollBtns, setShowScrollBtns] = useState(false);
 
-  const { switchTerminal } = useTerminal({ sendMessage });
+  const { switchTerminal, search, searchPrevious, clearSearch } = useTerminal({ sendMessage });
   const { activeResourceId, activeWorkspaceId } = useSessionStore();
 
   // 挂载/切换终端
@@ -236,12 +239,24 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
       }
       if (e.key === 'Escape') {
         e.preventDefault();
-        sendRaw('\x1b');
+        if (showSearch) {
+          setShowSearch(false);
+          setSearchQuery('');
+          clearSearch();
+        } else {
+          sendRaw('\x1b');
+        }
         return;
       }
       if (e.ctrlKey && (e.key === 'c' || e.key === 'C')) {
         e.preventDefault();
         sendRaw('\x03');
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'f' || e.key === 'F')) {
+        e.preventDefault();
+        setShowSearch(true);
+        setTimeout(() => searchInputRef.current?.focus(), 100);
         return;
       }
       if (e.key === 'ArrowUp' && inputValue.length === 0) {
@@ -253,7 +268,7 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
         sendRaw('\x1b[B');
       }
     },
-    [handleSubmit, sendRaw, inputValue]
+    [handleSubmit, sendRaw, inputValue, showSearch, clearSearch]
   );
 
   // Action bar 按钮
@@ -293,6 +308,19 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
       inputRef.current?.focus();
     }
   }, [copiedText]);
+
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (query) search(query);
+    else clearSearch();
+  }, [search, clearSearch]);
+
+  const handleSearchClose = useCallback(() => {
+    setShowSearch(false);
+    setSearchQuery('');
+    clearSearch();
+    inputRef.current?.focus();
+  }, [clearSearch]);
 
   // 中文快捷按钮处理
   const handleQuickAction = useCallback((action: string) => {
@@ -352,6 +380,38 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
 
   return (
     <div className="flex-1 flex flex-col bg-theme-bg min-h-0 overflow-hidden">
+      {showSearch && (
+        <div className="flex-shrink-0 px-3 py-2 bg-theme-surface border-b border-theme-border">
+          <div className="flex items-center gap-2">
+            <Icon name="search" size={16} className="text-theme-text-muted flex-shrink-0" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && searchQuery) {
+                  e.shiftKey ? searchPrevious(searchQuery) : search(searchQuery);
+                } else if (e.key === 'Escape') {
+                  handleSearchClose();
+                }
+              }}
+              placeholder="搜索终端内容..."
+              className="flex-1 bg-transparent text-theme-text placeholder-theme-text-muted text-sm focus:outline-none"
+              autoFocus
+            />
+            <button onClick={() => searchPrevious(searchQuery)} disabled={!searchQuery} className="p-1.5 rounded-md hover:bg-theme-surface-light text-theme-text-muted hover:text-theme-text disabled:opacity-30" title="上一个 (Shift+Enter)">
+              <Icon name="chevron-up" size={14} />
+            </button>
+            <button onClick={() => search(searchQuery)} disabled={!searchQuery} className="p-1.5 rounded-md hover:bg-theme-surface-light text-theme-text-muted hover:text-theme-text disabled:opacity-30" title="下一个 (Enter)">
+              <Icon name="chevron-down" size={14} />
+            </button>
+            <button onClick={handleSearchClose} className="p-1.5 rounded-md hover:bg-theme-surface-light text-theme-text-muted hover:text-theme-text" title="关闭 (Esc)">
+              <Icon name="x" size={14} />
+            </button>
+          </div>
+        </div>
+      )}
       {/* 终端渲染区域 */}
       <div
         className="flex-1 min-h-0 relative cursor-text"
@@ -561,6 +621,19 @@ export const Terminal: React.FC<TerminalProps> = ({ sendMessage }) => {
             title="Shift+Enter: newline"
           >
             <span>↵ Newline</span>
+          </button>
+
+          {/* 搜索 */}
+          <button
+            onClick={() => {
+              setShowSearch(true);
+              setTimeout(() => searchInputRef.current?.focus(), 100);
+            }}
+            className="flex-shrink-0 flex items-center gap-1 px-3 py-2 sm:px-2.5 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-mono text-theme-text-secondary hover:text-theme-text hover:bg-theme-surface-light border border-transparent hover:border-theme-border transition-all active:scale-95 min-h-[44px] sm:min-h-0"
+            title="Ctrl+F: 搜索终端内容"
+          >
+            <Icon name="search" size={12} className="sm:w-2.5 sm:h-2.5" />
+            <span>搜索</span>
           </button>
 
           {/* 分隔 */}

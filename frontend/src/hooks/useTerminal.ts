@@ -512,10 +512,28 @@ export function useTerminal({ sendMessage }: UseTerminalOptions) {
     return () => window.removeEventListener('ws:resource', handleResourceEvent);
   }, [writeToTerminal, restoreSnapshot, disposeTerminal]);
 
+  const search = useCallback((term: string) => {
+    if (!activeResourceId) return;
+    terminalPool.get(activeResourceId)?.searchAddon.findNext(term);
+  }, [activeResourceId]);
+
+  const searchPrevious = useCallback((term: string) => {
+    if (!activeResourceId) return;
+    terminalPool.get(activeResourceId)?.searchAddon.findPrevious(term);
+  }, [activeResourceId]);
+
+  const clearSearch = useCallback(() => {
+    if (!activeResourceId) return;
+    terminalPool.get(activeResourceId)?.searchAddon.clearDecorations();
+  }, [activeResourceId]);
+
   return {
     switchTerminal,
     writeToTerminal,
     disposeTerminal,
     fitTerminal,
+    search,
+    searchPrevious,
+    clearSearch,
   };
 }
