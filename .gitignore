@@ -5,3 +5,6 @@ dist/
 *.log
 *.tar.gz
 ws-deploy.tar.gz
+
+# Local AI-agent project state; canonical project instructions live in Git.
+/.pi/
