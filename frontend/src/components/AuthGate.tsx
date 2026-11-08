@@ -1,7 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Icon } from './Icon';
 
-const AUTH_PASSWORD = '9277';
+// 默认演示访问口令（建议生产环境通过配置自定义）
+const AUTH_PASSWORD = '1234';
 const AUTH_STORAGE_KEY = 'ai-workspace-auth';
 
 interface AuthGateProps {
