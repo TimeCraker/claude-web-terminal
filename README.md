@@ -1,8 +1,24 @@
-# AI Workspace OS
+<div align="center">
 
-自托管的 Web 终端管理器，专为管理多个长驻 Claude Code REPL 进程而设计。类似 Warp Terminal 的体验，通过浏览器即可在任意设备上操控服务器端的 AI 工作空间。
+# 💻 Claude Web Terminal (AI Workspace OS)
 
-**Live Demo**: https://workspace.asterforge.top
+**自托管的 Web 终端管理器：类 Warp 体验，随时随地在浏览器中操控 Claude Code**  
+*Self-hosted Web Terminal & Multi-Session Manager for Claude Code (React + Vite + xterm.js + node-pty)*
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![Frontend: React + Vite](https://img.shields.io/badge/Frontend-React%2018%20%7C%20Vite-61DAFB.svg?style=flat-square&logo=react&logoColor=black)](https://vitejs.dev/)
+[![Terminal: xterm.js](https://img.shields.io/badge/Terminal-xterm.js%20(WebGL)-2D5A88.svg?style=flat-square)](https://xtermjs.org/)
+[![Backend: tsx + ws + node-pty](https://img.shields.io/badge/Backend-tsx%20%7C%20ws%20%7C%20node--pty-CC785C.svg?style=flat-square)](#技术栈)
+
+<br/>
+
+> **解决什么痛点？**  
+> 移动端与跨设备无法直接操控本地 Claude Code 终端、关闭浏览器后 PTY 进程丢失、中文输入法在传统 Web 终端容易吞字断行。  
+> 本工具带来原生级 IME 输入体验、长驻 PTY 上下文、多工作空间隔离与多套预设美学主题。
+
+</div>
+
+---
 
 ## 核心特性
 
